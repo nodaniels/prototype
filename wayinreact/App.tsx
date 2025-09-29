@@ -27,6 +27,80 @@ import { listRoomIds, searchRoomInBuilding } from './src/utils/search';
 
 const typedPayload = buildingsPayload as BuildingsPayload;
 
+const buildingCodeMap: Record<string, keyof typeof typedPayload.buildings> = {
+  SP: 'solbjerg',
+  PH: 'porcelaenshaven',
+};
+
+const createCandidatesFromLocation = (
+  buildingKey: keyof typeof typedPayload.buildings,
+  token: string,
+): string[] => {
+  const candidates: string[] = [];
+  const pushCandidate = (value?: string | null) => {
+    if (!value) {
+      return;
+    }
+    const normalized = value.replace(/\s+/g, '');
+    if (!normalized) {
+      return;
+    }
+    const upper = normalized.toUpperCase();
+    if (!candidates.includes(upper)) {
+      candidates.push(upper);
+    }
+  };
+
+  const normalizedToken = token.trim().toUpperCase();
+  if (!normalizedToken) {
+    return candidates;
+  }
+
+  if (buildingKey === 'solbjerg') {
+    const primary = normalizedToken.replace(/[^A-Z0-9]/g, '');
+    if (primary) {
+      pushCandidate(primary);
+      const digitsOnly = primary.replace(/\D/g, '');
+      if (digitsOnly && digitsOnly !== primary) {
+        pushCandidate(digitsOnly);
+      }
+    }
+    return candidates;
+  }
+
+  if (buildingKey === 'porcelaenshaven') {
+    const sanitized = normalizedToken.replace(/[^A-Z0-9.]/g, '.');
+    const segments = sanitized.split('.').filter(Boolean);
+    const numericSegments = segments.map((segment) => segment.replace(/\D/g, '')).filter(Boolean);
+    let relevantSegments = numericSegments;
+    if (numericSegments.length > 2) {
+      relevantSegments = numericSegments.slice(-2);
+    }
+
+    let floorPart: string | null = null;
+    let roomPart: string | null = null;
+
+    if (relevantSegments.length >= 2) {
+      [floorPart, roomPart] = relevantSegments;
+    } else if (relevantSegments.length === 1) {
+      roomPart = relevantSegments[0];
+    }
+
+    if (floorPart && roomPart) {
+      pushCandidate(`${floorPart}${roomPart}`);
+      pushCandidate(`${floorPart}.${roomPart}`);
+    }
+    if (roomPart) {
+      pushCandidate(roomPart);
+    }
+
+    return candidates;
+  }
+
+  pushCandidate(normalizedToken.replace(/[^A-Z0-9]/g, ''));
+  return candidates;
+};
+
 interface BuildingEntry {
   key: string;
   data: BuildingData;
@@ -100,6 +174,34 @@ const App: React.FC = () => {
     (input: string): { buildingKey: string; result: SearchResult } | null => {
       if (!input.trim()) {
         return null;
+      }
+
+      const locationMatch = input.match(/lokalitet\s*:\s*([^\n]+)/i);
+      if (locationMatch) {
+        const locationValueRaw = locationMatch[1].trim();
+        const locationValueUpper = locationValueRaw.toUpperCase();
+
+        for (const [code, buildingKey] of Object.entries(buildingCodeMap)) {
+          const codeIndex = locationValueUpper.indexOf(code);
+          if (codeIndex === -1) {
+            continue;
+          }
+
+          const remainder = locationValueRaw.slice(codeIndex + code.length).trim();
+          const primaryToken = remainder.split(/\s+/)[0] ?? '';
+          const building = typedPayload.buildings[buildingKey];
+          if (!building) {
+            continue;
+          }
+
+          const candidates = createCandidatesFromLocation(buildingKey, primaryToken);
+          for (const candidate of candidates) {
+            const match = searchRoomInBuilding(building, candidate);
+            if (match) {
+              return { buildingKey, result: match };
+            }
+          }
+        }
       }
 
       const directMatch = searchAcrossBuildings(input);
