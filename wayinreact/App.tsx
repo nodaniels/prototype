@@ -1,0 +1,334 @@
+import React, { useMemo, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+
+import buildingsPayload from './src/data/buildings.json';
+import type { BuildingData, BuildingsPayload, SearchResult } from './src/types';
+import { BuildingPicker } from './src/components/BuildingPicker';
+import { FloorViewer } from './src/components/FloorViewer';
+import { listRoomIds, searchRoomInBuilding } from './src/utils/search';
+
+const typedPayload = buildingsPayload as BuildingsPayload;
+
+interface BuildingEntry {
+  key: string;
+  data: BuildingData;
+  name: string;
+}
+
+const App: React.FC = () => {
+  const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const buildingEntries = useMemo<BuildingEntry[]>(() => {
+    return Object.entries(typedPayload.buildings).map(([key, value]) => ({
+      key,
+      data: value,
+      name: value.originalName
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (match) => match.toUpperCase()),
+    }));
+  }, []);
+
+  const selectedBuilding: BuildingData | null = selectedBuildingKey
+    ? typedPayload.buildings[selectedBuildingKey]
+    : null;
+
+  const roomSuggestions = useMemo(() => {
+    if (!selectedBuilding) {
+      return [] as string[];
+    }
+    return listRoomIds(selectedBuilding).slice(0, 20);
+  }, [selectedBuilding]);
+
+  const handleSelectBuilding = (key: string) => {
+    setSelectedBuildingKey(key);
+    setSearchQuery('');
+    setSearchResult(null);
+    setErrorMessage(null);
+  };
+
+  const handleSearch = () => {
+    if (!selectedBuilding) {
+      return;
+    }
+
+    const result = searchRoomInBuilding(selectedBuilding, searchQuery);
+    if (!result) {
+      setSearchResult(null);
+      setErrorMessage(`Kunne ikke finde "${searchQuery}"`);
+      return;
+    }
+
+    setSearchResult(result);
+    setErrorMessage(null);
+  };
+
+  const handleSuggestionPress = (roomId: string) => {
+    setSearchQuery(roomId);
+    setTimeout(handleSearch, 0);
+  };
+
+  const handleBack = () => {
+    setSelectedBuildingKey(null);
+    setSearchQuery('');
+    setSearchResult(null);
+    setErrorMessage(null);
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
+        style={styles.keyboardAvoider}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.content}>
+            <View style={styles.header}>
+              {selectedBuilding ? (
+                <Pressable onPress={handleBack} style={styles.backButton} accessibilityRole="button">
+                  <Text style={styles.backLabel}>← Tilbage</Text>
+                </Pressable>
+              ) : null}
+              <Text style={styles.title}>Building Navigation</Text>
+              <Text style={styles.subtitle}>
+                Find nemt lokaler og indgange i Porcelænshaven og Solbjerg Campus
+              </Text>
+            </View>
+
+            {!selectedBuilding ? (
+              <BuildingPicker
+                buildings={buildingEntries.map((entry: BuildingEntry) => ({
+                  key: entry.key,
+                  name: entry.name,
+                  description: `${Object.keys(entry.data.floors).length} etager`,
+                }))}
+                onSelect={handleSelectBuilding}
+              />
+            ) : (
+              <View style={styles.searchSection}>
+                <Text style={styles.sectionTitle}>{selectedBuilding.originalName.toUpperCase()}</Text>
+                <Text style={styles.sectionSubtitle}>Indtast et lokale-navn (fx S10, R2.17, A101)</Text>
+
+                <View style={styles.searchRow}>
+                  <TextInput
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="Søg efter lokale"
+                    placeholderTextColor="#94a3b8"
+                    style={styles.input}
+                    returnKeyType="search"
+                    onSubmitEditing={handleSearch}
+                  />
+                  <Pressable style={styles.searchButton} onPress={handleSearch}>
+                    <Text style={styles.searchButtonLabel}>Søg</Text>
+                  </Pressable>
+                </View>
+
+                {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+
+                {roomSuggestions.length > 0 ? (
+                  <View style={styles.suggestionContainer}>
+                    <Text style={styles.suggestionLabel}>Populære lokaler</Text>
+                    <View style={styles.suggestionRow}>
+                      {roomSuggestions.map((roomId: string) => (
+                        <Pressable
+                          key={roomId}
+                          onPress={() => handleSuggestionPress(roomId)}
+                          style={styles.suggestionChip}
+                        >
+                          <Text style={styles.suggestionText}>{roomId}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                {searchResult ? (
+                  <View style={styles.resultCard}>
+                    <Text style={styles.resultTitle}>
+                      Fundet {searchResult.room.id} på {searchResult.floor.originalName}
+                    </Text>
+                    {searchResult.entrance ? (
+                      <Text style={styles.resultSubtitle}>
+                        Nærmeste indgang markeret med orange prik
+                      </Text>
+                    ) : (
+                      <Text style={styles.resultSubtitle}>Ingen indgang fundet – viser kun lokalet</Text>
+                    )}
+                    <FloorViewer
+                      buildingKey={selectedBuildingKey!}
+                      floorKey={searchResult.floorKey}
+                      room={searchResult.room}
+                      entrance={searchResult.entrance}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.placeholder}>
+                    <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
+                    <Text style={styles.placeholderSubtitle}>
+                      Vi viser automatisk den rigtige etage og markerer lokalet med grønt.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+export default App;
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+  },
+  keyboardAvoider: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    gap: 24,
+  },
+  header: {
+    gap: 8,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  backLabel: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  subtitle: {
+    color: '#64748b',
+    fontSize: 16,
+  },
+  searchSection: {
+    gap: 20,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  sectionSubtitle: {
+    color: '#475467',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#cbd5f5',
+    color: '#0f172a',
+  },
+  searchButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+  },
+  searchButtonLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  error: {
+    color: '#ef4444',
+    fontWeight: '600',
+  },
+  suggestionContainer: {
+    gap: 12,
+  },
+  suggestionLabel: {
+    color: '#475467',
+    fontWeight: '600',
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  suggestionChip: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  suggestionText: {
+    color: '#0369a1',
+    fontWeight: '600',
+  },
+  resultCard: {
+    gap: 16,
+    padding: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    shadowColor: '#020617',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  resultTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  resultSubtitle: {
+    color: '#475467',
+  },
+  placeholder: {
+    gap: 8,
+    padding: 24,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 20,
+    alignItems: 'flex-start',
+  },
+  placeholderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  placeholderSubtitle: {
+    color: '#475467',
+  },
+});
