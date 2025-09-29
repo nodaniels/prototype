@@ -356,7 +356,7 @@ const App: React.FC = () => {
                 </Pressable>
               ) : (
                 <>
-                  <Text style={styles.title}>WayInn - find lokale</Text>
+                    <Text style={[styles.title, { color: '#1D4ED8' }]}>WayInn™</Text>
                 </>
               )}
             </View>
