@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -55,6 +55,8 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [displayedFloor, setDisplayedFloor] = useState<DisplayedFloor | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [quickLookupValue, setQuickLookupValue] = useState('');
+  const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
 
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
     return Object.entries(typedPayload.buildings).map(([key, value]) => ({
@@ -77,10 +79,87 @@ const App: React.FC = () => {
     return listRoomIds(selectedBuilding).slice(0, 20);
   }, [selectedBuilding]);
 
-  const handleSelectBuilding = (key: string) => {
+  const searchAcrossBuildings = useCallback(
+    (query: string): { buildingKey: string; result: SearchResult } | null => {
+      const normalized = query.trim().toUpperCase();
+      if (!normalized) {
+        return null;
+      }
+      for (const [buildingKey, building] of Object.entries(typedPayload.buildings)) {
+        const match = searchRoomInBuilding(building, normalized);
+        if (match) {
+          return { buildingKey, result: match };
+        }
+      }
+      return null;
+    },
+    [],
+  );
+
+  const extractRoomFromText = useCallback(
+    (input: string): { buildingKey: string; result: SearchResult } | null => {
+      if (!input.trim()) {
+        return null;
+      }
+
+      const directMatch = searchAcrossBuildings(input);
+      if (directMatch) {
+        return directMatch;
+      }
+
+      const tokens = input.match(/[A-ZÆØÅ0-9._-]+/gi);
+      if (tokens) {
+        for (const token of tokens) {
+          const match = searchAcrossBuildings(token);
+          if (match) {
+            return match;
+          }
+        }
+      }
+
+      return null;
+    },
+    [searchAcrossBuildings],
+  );
+
+  const applySearchResult = useCallback(
+    (buildingKey: string, result: SearchResult) => {
+      setSelectedBuildingKey(buildingKey);
+      setSearchQuery(result.room.id);
+      setQuickLookupError(null);
+      setDisplayedFloor({
+        floorKey: result.floorKey,
+        floor: result.floor,
+        room: result.room,
+        entrance: result.entrance,
+        fromSearch: true,
+      });
+      setErrorMessage(null);
+    },
+    [],
+  );
+
+  const handleQuickLookup = useCallback(() => {
+    if (!quickLookupValue.trim()) {
+      setQuickLookupError('Indsæt et lokalenummer');
+      return;
+    }
+
+    const match = extractRoomFromText(quickLookupValue);
+    if (!match) {
+      setQuickLookupError('Kunne ikke finde lokalet. Tjek at nummeret er korrekt.');
+      return;
+    }
+
+    setQuickLookupError(null);
+    applySearchResult(match.buildingKey, match.result);
+  }, [applySearchResult, extractRoomFromText, quickLookupValue]);
+
+  const handleSelectBuilding = useCallback((key: string) => {
     setSelectedBuildingKey(key);
     setSearchQuery('');
     setErrorMessage(null);
+    setQuickLookupError(null);
 
     const building = typedPayload.buildings[key];
     if (!building) {
@@ -102,41 +181,60 @@ const App: React.FC = () => {
     } else {
       setDisplayedFloor(null);
     }
-  };
+  }, []);
 
-  const handleSearch = () => {
-    if (!selectedBuilding) {
+  const handleSearch = useCallback(() => {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
       return;
     }
 
-    const result = searchRoomInBuilding(selectedBuilding, searchQuery);
-    if (!result) {
-      setDisplayedFloor((prev) => (prev && !prev.fromSearch ? prev : null));
-      setErrorMessage(`Kunne ikke finde "${searchQuery}"`);
+    if (selectedBuilding && selectedBuildingKey) {
+      const result = searchRoomInBuilding(selectedBuilding, trimmedQuery);
+      if (!result) {
+        setErrorMessage('Kunne ikke finde lokalet. Tjek at nummeret er korrekt.');
+        return;
+      }
+      applySearchResult(selectedBuildingKey, result);
       return;
     }
 
-    setDisplayedFloor({
-      floorKey: result.floorKey,
-      floor: result.floor,
-      room: result.room,
-      entrance: result.entrance,
-      fromSearch: true,
-    });
-    setErrorMessage(null);
-  };
+    const globalMatch = extractRoomFromText(trimmedQuery);
+    if (!globalMatch) {
+      setErrorMessage('Kunne ikke finde lokalet. Vælg en bygning eller indsæt et gyldigt lokalenummer.');
+      return;
+    }
 
-  const handleSuggestionPress = (roomId: string) => {
-    setSearchQuery(roomId);
-    setTimeout(handleSearch, 0);
-  };
+    applySearchResult(globalMatch.buildingKey, globalMatch.result);
+  }, [
+    applySearchResult,
+    extractRoomFromText,
+    searchQuery,
+    selectedBuilding,
+    selectedBuildingKey,
+  ]);
 
-  const handleBack = () => {
+  const handleSuggestionPress = useCallback(
+    (roomId: string) => {
+      if (!selectedBuilding || !selectedBuildingKey) {
+        return;
+      }
+      const result = searchRoomInBuilding(selectedBuilding, roomId);
+      if (!result) {
+        return;
+      }
+      applySearchResult(selectedBuildingKey, result);
+    },
+    [applySearchResult, selectedBuilding, selectedBuildingKey],
+  );
+
+  const handleBack = useCallback(() => {
     setSelectedBuildingKey(null);
     setSearchQuery('');
     setDisplayedFloor(null);
     setErrorMessage(null);
-  };
+    setQuickLookupError(null);
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -152,19 +250,50 @@ const App: React.FC = () => {
                 <Pressable onPress={handleBack} style={styles.backButton} accessibilityRole="button">
                   <Text style={styles.backLabel}>← Tilbage</Text>
                 </Pressable>
-              ) : null}
-              
+                ) : (
+                  <>
+                    <Text style={styles.title}>WayInn - find lokale</Text>
+                    
+                  </>
+                )}
             </View>
 
             {!selectedBuilding ? (
-              <BuildingPicker
-                buildings={buildingEntries.map((entry: BuildingEntry) => ({
-                  key: entry.key,
-                  name: entry.name,
-                  description: `${Object.keys(entry.data.floors).length} etager`,
-                }))}
-                onSelect={handleSelectBuilding}
-              />
+              <View style={styles.landing}>
+                <View style={styles.quickLookupCard}>
+                  <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
+                  <TextInput
+                    value={quickLookupValue}
+                    onChangeText={(value) => {
+                      setQuickLookupValue(value);
+                      setQuickLookupError(null);
+                    }}
+                    placeholder="Fx “Statusmøde i S10” eller “Lokale R2.17, Solbjerg”"
+                    placeholderTextColor="#94a3b8"
+                    style={styles.quickLookupInput}
+                    multiline
+                    textAlignVertical="top"
+                    autoCorrect={false}
+                    onSubmitEditing={handleQuickLookup}
+                    blurOnSubmit
+                  />
+                  <Pressable style={styles.quickLookupButton} onPress={handleQuickLookup}>
+                    <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
+                  </Pressable>
+                  {quickLookupError ? <Text style={styles.error}>{quickLookupError}</Text> : null}
+                </View>
+
+                <View style={styles.buildingPickerSection}>
+                  <BuildingPicker
+                    buildings={buildingEntries.map((entry: BuildingEntry) => ({
+                      key: entry.key,
+                      name: entry.name,
+                      description: `${Object.keys(entry.data.floors).length} etager`,
+                    }))}
+                    onSelect={handleSelectBuilding}
+                  />
+                </View>
+              </View>
             ) : (
               <View style={styles.searchSection}>
                 <Text style={styles.sectionTitle}>{selectedBuilding.originalName.toUpperCase()}</Text>
@@ -294,6 +423,55 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#64748b',
     fontSize: 16,
+  },
+  landing: {
+    gap: 28,
+  },
+  quickLookupCard: {
+    gap: 12,
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+  },
+  quickLookupTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  quickLookupDescription: {
+    color: '#475467',
+    lineHeight: 20,
+  },
+  quickLookupInput: {
+    minHeight: 88,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#cbd5f5',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  quickLookupButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  quickLookupButtonLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  quickLookupHint: {
+    color: '#64748b',
+    fontSize: 13,
+  },
+  buildingPickerSection: {
+    gap: 12,
   },
   searchSection: {
     gap: 20,
