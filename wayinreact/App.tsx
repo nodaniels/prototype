@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -131,6 +132,7 @@ const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [quickLookupValue, setQuickLookupValue] = useState('');
   const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
+  const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false);
 
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
     return Object.entries(typedPayload.buildings).map(([key, value]) => ({
@@ -352,18 +354,26 @@ const App: React.FC = () => {
                 <Pressable onPress={handleBack} style={styles.backButton} accessibilityRole="button">
                   <Text style={styles.backLabel}>← Tilbage</Text>
                 </Pressable>
-                ) : (
-                  <>
-                    <Text style={styles.title}>WayInn - find lokale</Text>
-                    
-                  </>
-                )}
+              ) : (
+                <>
+                  <Text style={styles.title}>WayInn - find lokale</Text>
+                </>
+              )}
             </View>
 
             {!selectedBuilding ? (
               <View style={styles.landing}>
                 <View style={styles.quickLookupCard}>
-                  <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
+                  <View style={styles.quickLookupHeader}>
+                    <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setQuickLookupInfoVisible(true)}
+                      style={styles.quickLookupInfoButton}
+                    >
+                      <Text style={styles.quickLookupInfoLabel}>i</Text>
+                    </Pressable>
+                  </View>
                   <TextInput
                     value={quickLookupValue}
                     onChangeText={(value) => {
@@ -483,6 +493,34 @@ const App: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        visible={quickLookupInfoVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setQuickLookupInfoVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setQuickLookupInfoVisible(false)}
+          />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Sådan gør du</Text>
+            <Text style={styles.modalBody}>
+              Åbn din kalender og kopier teksten fra undervisningstimen med lokalenummeret. Indsæt den
+              herefter i feltet, så finder vi automatisk det rigtige lokale for dig.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.modalCloseButton}
+              onPress={() => setQuickLookupInfoVisible(false)}
+            >
+              <Text style={styles.modalCloseLabel}>Forstået</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -537,10 +575,27 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e2e8f0',
   },
+  quickLookupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   quickLookupTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#0f172a',
+  },
+  quickLookupInfoButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e0f2fe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickLookupInfoLabel: {
+    color: '#0369a1',
+    fontWeight: '700',
   },
   quickLookupDescription: {
     color: '#475467',
@@ -673,5 +728,45 @@ const styles = StyleSheet.create({
   },
   placeholderSubtitle: {
     color: '#475467',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    gap: 16,
+    width: '100%',
+    maxWidth: 380,
+    shadowColor: '#020617',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  modalBody: {
+    color: '#475467',
+    lineHeight: 20,
+  },
+  modalCloseButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  modalCloseLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });
