@@ -13,7 +13,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 import buildingsPayload from './src/data/buildings.json';
-import type { BuildingData, BuildingsPayload, SearchResult } from './src/types';
+import type {
+  BuildingData,
+  BuildingsPayload,
+  Entrance,
+  FloorData,
+  Room,
+  SearchResult,
+} from './src/types';
 import { BuildingPicker } from './src/components/BuildingPicker';
 import { FloorViewer } from './src/components/FloorViewer';
 import { listRoomIds, searchRoomInBuilding } from './src/utils/search';
@@ -26,10 +33,27 @@ interface BuildingEntry {
   name: string;
 }
 
+interface DisplayedFloor {
+  floorKey: string;
+  floor: FloorData;
+  room?: Room;
+  entrance?: Entrance | null;
+  fromSearch: boolean;
+}
+
+const isGroundFloor = (key: string, floor: FloorData) => {
+  const haystack = `${key} ${floor.originalName}`.toLowerCase();
+  return (
+    haystack.includes('stue') ||
+    haystack.includes('ground') ||
+    /(^|[^\d])0([^\d]|$)/.test(haystack)
+  );
+};
+
 const App: React.FC = () => {
   const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [displayedFloor, setDisplayedFloor] = useState<DisplayedFloor | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
@@ -56,8 +80,28 @@ const App: React.FC = () => {
   const handleSelectBuilding = (key: string) => {
     setSelectedBuildingKey(key);
     setSearchQuery('');
-    setSearchResult(null);
     setErrorMessage(null);
+
+    const building = typedPayload.buildings[key];
+    if (!building) {
+      setDisplayedFloor(null);
+      return;
+    }
+
+    const entries = Object.entries(building.floors);
+    const defaultEntry =
+      entries.find(([floorKey, floor]) => isGroundFloor(floorKey, floor)) ?? entries[0];
+
+    if (defaultEntry) {
+      const [floorKeyDefault, floorDefault] = defaultEntry;
+      setDisplayedFloor({
+        floorKey: floorKeyDefault,
+        floor: floorDefault,
+        fromSearch: false,
+      });
+    } else {
+      setDisplayedFloor(null);
+    }
   };
 
   const handleSearch = () => {
@@ -67,12 +111,18 @@ const App: React.FC = () => {
 
     const result = searchRoomInBuilding(selectedBuilding, searchQuery);
     if (!result) {
-      setSearchResult(null);
+      setDisplayedFloor((prev) => (prev && !prev.fromSearch ? prev : null));
       setErrorMessage(`Kunne ikke finde "${searchQuery}"`);
       return;
     }
 
-    setSearchResult(result);
+    setDisplayedFloor({
+      floorKey: result.floorKey,
+      floor: result.floor,
+      room: result.room,
+      entrance: result.entrance,
+      fromSearch: true,
+    });
     setErrorMessage(null);
   };
 
@@ -84,7 +134,7 @@ const App: React.FC = () => {
   const handleBack = () => {
     setSelectedBuildingKey(null);
     setSearchQuery('');
-    setSearchResult(null);
+    setDisplayedFloor(null);
     setErrorMessage(null);
   };
 
@@ -103,10 +153,7 @@ const App: React.FC = () => {
                   <Text style={styles.backLabel}>← Tilbage</Text>
                 </Pressable>
               ) : null}
-              <Text style={styles.title}>Building Navigation</Text>
-              <Text style={styles.subtitle}>
-                Find nemt lokaler og indgange i Porcelænshaven og Solbjerg Campus
-              </Text>
+              
             </View>
 
             {!selectedBuilding ? (
@@ -140,6 +187,49 @@ const App: React.FC = () => {
 
                 {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
+                {displayedFloor ? (
+                  <View style={styles.resultCard}>
+                    {displayedFloor.room ? (
+                      <>
+                        <Text style={styles.resultTitle}>
+                          Fundet {displayedFloor.room.id} på {displayedFloor.floor.originalName}
+                        </Text>
+                        {displayedFloor.entrance ? (
+                          <Text style={styles.resultSubtitle}>
+                            Nærmeste indgang markeret med orange prik
+                          </Text>
+                        ) : (
+                          <Text style={styles.resultSubtitle}>
+                            Ingen indgang fundet – viser kun lokalet
+                          </Text>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.resultTitle}>
+                          Viser {displayedFloor.floor.originalName}
+                        </Text>
+                        <Text style={styles.resultSubtitle}>
+                          Ingen søgning endnu – stueetagen vises som udgangspunkt.
+                        </Text>
+                      </>
+                    )}
+                    <FloorViewer
+                      buildingKey={selectedBuildingKey!}
+                      floorKey={displayedFloor.floorKey}
+                      room={displayedFloor.room}
+                      entrance={displayedFloor.entrance}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.placeholder}>
+                    <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
+                    <Text style={styles.placeholderSubtitle}>
+                      Vi viser automatisk den rigtige etage og markerer lokalet med grønt.
+                    </Text>
+                  </View>
+                )}
+
                 {roomSuggestions.length > 0 ? (
                   <View style={styles.suggestionContainer}>
                     <Text style={styles.suggestionLabel}>Populære lokaler</Text>
@@ -156,34 +246,6 @@ const App: React.FC = () => {
                     </View>
                   </View>
                 ) : null}
-
-                {searchResult ? (
-                  <View style={styles.resultCard}>
-                    <Text style={styles.resultTitle}>
-                      Fundet {searchResult.room.id} på {searchResult.floor.originalName}
-                    </Text>
-                    {searchResult.entrance ? (
-                      <Text style={styles.resultSubtitle}>
-                        Nærmeste indgang markeret med orange prik
-                      </Text>
-                    ) : (
-                      <Text style={styles.resultSubtitle}>Ingen indgang fundet – viser kun lokalet</Text>
-                    )}
-                    <FloorViewer
-                      buildingKey={selectedBuildingKey!}
-                      floorKey={searchResult.floorKey}
-                      room={searchResult.room}
-                      entrance={searchResult.entrance}
-                    />
-                  </View>
-                ) : (
-                  <View style={styles.placeholder}>
-                    <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
-                    <Text style={styles.placeholderSubtitle}>
-                      Vi viser automatisk den rigtige etage og markerer lokalet med grønt.
-                    </Text>
-                  </View>
-                )}
               </View>
             )}
           </View>

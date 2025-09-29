@@ -6,8 +6,8 @@ import type { Entrance, Room } from '../types';
 interface FloorViewerProps {
   buildingKey: string;
   floorKey: string;
-  room: Room;
-  entrance: Entrance | null;
+  room?: Room;
+  entrance?: Entrance | null;
 }
 
 interface Dimensions {
@@ -67,30 +67,41 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
     );
   }
 
+  const showRoom = Boolean(room);
+  const showEntrance = Boolean(entrance);
+
   return (
     <View>
-      <View style={styles.legend}>
-        <View style={[styles.legendDot, styles.roomDot]} />
-        <Text style={styles.legendLabel}>Søgt lokale</Text>
-        {entrance ? (
-          <>
-            <View style={[styles.legendDot, styles.entranceDot]} />
-            <Text style={styles.legendLabel}>Nærmeste indgang</Text>
-          </>
-        ) : null}
-      </View>
+      {showRoom || showEntrance ? (
+        <View style={styles.legend}>
+          {showRoom ? (
+            <>
+              <View style={[styles.legendDot, styles.roomDot]} />
+              <Text style={styles.legendLabel}>Søgt lokale</Text>
+            </>
+          ) : null}
+          {showEntrance ? (
+            <>
+              <View style={[styles.legendDot, styles.entranceDot]} />
+              <Text style={styles.legendLabel}>Nærmeste indgang</Text>
+            </>
+          ) : null}
+        </View>
+      ) : null}
       <View style={[styles.viewer, { aspectRatio }]} onLayout={handleLayout}>
         <Image source={source} style={styles.image} resizeMode="contain" />
         {dimensions.width > 0 ? (
           <>
-            <View
-              style={[
-                styles.marker,
-                styles.roomDot,
-                computePosition(dimensions, room),
-              ]}
-            />
-            {entrance ? (
+            {showRoom && room ? (
+              <View
+                style={[
+                  styles.marker,
+                  styles.roomDot,
+                  computePosition(dimensions, room),
+                ]}
+              />
+            ) : null}
+            {showEntrance && entrance ? (
               <View
                 style={[
                   styles.marker,
