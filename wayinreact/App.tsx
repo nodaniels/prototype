@@ -217,6 +217,7 @@ const App: React.FC = () => {
                     <FloorViewer
                       buildingKey={selectedBuildingKey!}
                       floorKey={displayedFloor.floorKey}
+                      floorName={displayedFloor.floor.originalName}
                       room={displayedFloor.room}
                       entrance={displayedFloor.entrance}
                     />

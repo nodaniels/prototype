@@ -6,6 +6,7 @@ import type { Entrance, Room } from '../types';
 interface FloorViewerProps {
   buildingKey: string;
   floorKey: string;
+  floorName: string;
   room?: Room;
   entrance?: Entrance | null;
 }
@@ -32,11 +33,22 @@ const images = floorImages as Record<string, Record<string, number>>;
 export const FloorViewer: React.FC<FloorViewerProps> = ({
   buildingKey,
   floorKey,
+  floorName,
   room,
   entrance,
 }: FloorViewerProps) => {
   const source = images[buildingKey]?.[floorKey];
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
+
+  const floorLabel = useMemo(() => {
+    const normalized = floorName.replace(/_/g, ' ').trim();
+    const withDot = normalized.replace(/(\d+)\s+sal/i, '$1. sal');
+    return withDot
+      .toLowerCase()
+      .split(' ')
+      .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
+      .join(' ');
+  }, [floorName]);
 
   const aspectRatio = useMemo(() => {
     if (!source) {
@@ -112,6 +124,9 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
             ) : null}
           </>
         ) : null}
+        <View style={styles.floorBadge}>
+          <Text style={styles.floorBadgeText}>{floorLabel}</Text>
+        </View>
       </View>
     </View>
   );
@@ -170,5 +185,19 @@ const styles = StyleSheet.create({
   missingText: {
     color: '#b91c1c',
     fontWeight: '600',
+  },
+  floorBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  floorBadgeText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
