@@ -7,11 +7,13 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 
 import buildingsPayload from './src/data/buildings.json';
 import type {
@@ -102,6 +104,16 @@ const createCandidatesFromLocation = (
   return candidates;
 };
 
+type TabKey = 'home' | 'institutions' | 'settings';
+
+interface InstitutionOption {
+  id: string;
+  name: string;
+  organization: string;
+  region: string;
+  campuses: string[];
+}
+
 interface BuildingEntry {
   key: string;
   data: BuildingData;
@@ -133,6 +145,48 @@ const App: React.FC = () => {
   const [quickLookupValue, setQuickLookupValue] = useState('');
   const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
   const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('home');
+
+  const institutionOptions = useMemo<InstitutionOption[]>(
+    () => [
+      {
+        id: 'novo',
+        name: 'Novo Nordisk',
+        organization: 'Life science',
+        region: 'Bagsværd, Danmark',
+        campuses: ['Bagsværd HQ', 'Fremtidens laboratorier', 'Kalundborg Production'],
+      },
+      {
+        id: 'cbs',
+        name: 'Copenhagen Business School',
+        organization: 'Universitet',
+        region: 'Frederiksberg, København',
+        campuses: ['Solbjerg Campus', 'Porcelænshaven Campus', 'Dalgas Have'],
+      },
+      {
+        id: 'maersk',
+        name: 'A.P. Møller - Mærsk',
+        organization: 'Shipping & logistics',
+        region: 'København Ø, Danmark',
+        campuses: ['Esplanaden HQ', 'Terminal Operations'],
+      },
+    ],
+    [],
+  );
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(
+    () => institutionOptions[0]?.id ?? null,
+  );
+  const selectedInstitution = useMemo(() => {
+    return (
+      institutionOptions.find((option) => option.id === selectedInstitutionId) ??
+      institutionOptions[0] ??
+      null
+    );
+  }, [institutionOptions, selectedInstitutionId]);
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
     return Object.entries(typedPayload.buildings).map(([key, value]) => ({
@@ -343,156 +397,349 @@ const App: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-        style={styles.keyboardAvoider}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <View style={styles.content}>
-            <View style={styles.header}>
-              {selectedBuilding ? (
-                <Pressable onPress={handleBack} style={styles.backButton} accessibilityRole="button">
-                  <Text style={styles.backLabel}>← Tilbage</Text>
-                </Pressable>
-              ) : (
-                <>
-                    <Text style={[styles.title, { color: '#1D4ED8' }]}>WayInn™</Text>
-                </>
-              )}
-            </View>
-
-            {!selectedBuilding ? (
-              <View style={styles.landing}>
-                <View style={styles.quickLookupCard}>
-                  <View style={styles.quickLookupHeader}>
-                    <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setQuickLookupInfoVisible(true)}
-                      style={styles.quickLookupInfoButton}
-                    >
-                      <Text style={styles.quickLookupInfoLabel}>i</Text>
+      <View style={styles.screen}>
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
+          style={styles.keyboardAvoider}
+          enabled={activeTab === 'home'}
+        >
+          {activeTab === 'home' ? (
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.content}>
+                <View style={styles.header}>
+                  {selectedBuilding ? (
+                    <Pressable onPress={handleBack} style={styles.backButton} accessibilityRole="button">
+                      <Text style={styles.backLabel}>← Tilbage</Text>
                     </Pressable>
-                  </View>
-                  <TextInput
-                    value={quickLookupValue}
-                    onChangeText={(value) => {
-                      setQuickLookupValue(value);
-                      setQuickLookupError(null);
-                    }}
-                    placeholder="Fx “Statusmøde i S10” eller “Lokale R2.17, Solbjerg”"
-                    placeholderTextColor="#94a3b8"
-                    style={styles.quickLookupInput}
-                    multiline
-                    textAlignVertical="top"
-                    autoCorrect={false}
-                    onSubmitEditing={handleQuickLookup}
-                    blurOnSubmit
-                  />
-                  <Pressable style={styles.quickLookupButton} onPress={handleQuickLookup}>
-                    <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
-                  </Pressable>
-                  {quickLookupError ? <Text style={styles.error}>{quickLookupError}</Text> : null}
+                  ) : (
+                    <Text style={[styles.title, styles.titleAccent]}>WayInn™</Text>
+                  )}
                 </View>
 
-                <View style={styles.buildingPickerSection}>
-                  <BuildingPicker
-                    buildings={buildingEntries.map((entry: BuildingEntry) => ({
-                      key: entry.key,
-                      name: entry.name,
-                      description: `${Object.keys(entry.data.floors).length} etager`,
-                    }))}
-                    onSelect={handleSelectBuilding}
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.searchSection}>
-                <Text style={styles.sectionTitle}>{selectedBuilding.originalName.toUpperCase()}</Text>
-                <Text style={styles.sectionSubtitle}>Indtast et lokale-navn (fx S10, R2.17, A101)</Text>
+                {!selectedBuilding ? (
+                  <View style={styles.landing}>
+                    <View style={styles.quickLookupCard}>
+                      <View style={styles.quickLookupHeader}>
+                        <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => setQuickLookupInfoVisible(true)}
+                          style={styles.quickLookupInfoButton}
+                        >
+                          <Text style={styles.quickLookupInfoLabel}>i</Text>
+                        </Pressable>
+                      </View>
+                      <TextInput
+                        value={quickLookupValue}
+                        onChangeText={(value) => {
+                          setQuickLookupValue(value);
+                          setQuickLookupError(null);
+                        }}
+                        placeholder="Fx “Statusmøde i S10” eller “Lokale R2.17, Solbjerg”"
+                        placeholderTextColor="#94a3b8"
+                        style={styles.quickLookupInput}
+                        multiline
+                        textAlignVertical="top"
+                        autoCorrect={false}
+                        onSubmitEditing={handleQuickLookup}
+                        blurOnSubmit
+                      />
+                      <Pressable style={styles.quickLookupButton} onPress={handleQuickLookup}>
+                        <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
+                      </Pressable>
+                      {quickLookupError ? <Text style={styles.error}>{quickLookupError}</Text> : null}
+                    </View>
 
-                <View style={styles.searchRow}>
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Søg efter lokale"
-                    placeholderTextColor="#94a3b8"
-                    style={styles.input}
-                    returnKeyType="search"
-                    onSubmitEditing={handleSearch}
-                  />
-                  <Pressable style={styles.searchButton} onPress={handleSearch}>
-                    <Text style={styles.searchButtonLabel}>Søg</Text>
-                  </Pressable>
-                </View>
-
-                {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-
-                {displayedFloor ? (
-                  <View style={styles.resultCard}>
-                    {displayedFloor.room ? (
-                      <>
-                        <Text style={styles.resultTitle}>
-                          Fundet {displayedFloor.room.id} på {displayedFloor.floor.originalName}
-                        </Text>
-                        {displayedFloor.entrance ? (
-                          <Text style={styles.resultSubtitle}>
-                            Nærmeste indgang markeret med orange prik
-                          </Text>
-                        ) : (
-                          <Text style={styles.resultSubtitle}>
-                            Ingen indgang fundet – viser kun lokalet
-                          </Text>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.resultTitle}>
-                          Viser {displayedFloor.floor.originalName}
-                        </Text>
-                        <Text style={styles.resultSubtitle}>
-                          Ingen søgning endnu – stueetagen vises som udgangspunkt.
-                        </Text>
-                      </>
-                    )}
-                    <FloorViewer
-                      buildingKey={selectedBuildingKey!}
-                      floorKey={displayedFloor.floorKey}
-                      floorName={displayedFloor.floor.originalName}
-                      room={displayedFloor.room}
-                      entrance={displayedFloor.entrance}
-                    />
+                    <View style={styles.buildingPickerSection}>
+                      <BuildingPicker
+                        buildings={buildingEntries.map((entry: BuildingEntry) => ({
+                          key: entry.key,
+                          name: entry.name,
+                        }))}
+                        onSelect={handleSelectBuilding}
+                      />
+                    </View>
                   </View>
                 ) : (
-                  <View style={styles.placeholder}>
-                    <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
-                    <Text style={styles.placeholderSubtitle}>
-                      Vi viser automatisk den rigtige etage og markerer lokalet med grønt.
-                    </Text>
+                  <View style={styles.searchSection}>
+                    <Text style={styles.sectionTitle}>{selectedBuilding.originalName.toUpperCase()}</Text>
+                    <Text style={styles.sectionSubtitle}>Indtast et lokale-navn (fx S10, R2.17, A101)</Text>
+
+                    <View style={styles.searchRow}>
+                      <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Søg efter lokale"
+                        placeholderTextColor="#94a3b8"
+                        style={styles.input}
+                        returnKeyType="search"
+                        onSubmitEditing={handleSearch}
+                      />
+                      <Pressable style={styles.searchButton} onPress={handleSearch}>
+                        <Text style={styles.searchButtonLabel}>Søg</Text>
+                      </Pressable>
+                    </View>
+
+                    {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+
+                    {displayedFloor ? (
+                      <View style={styles.resultCard}>
+                        {displayedFloor.room ? (
+                          <>
+                            <Text style={styles.resultTitle}>
+                              Fundet {displayedFloor.room.id} på {displayedFloor.floor.originalName}
+                            </Text>
+                            {displayedFloor.entrance ? (
+                              <Text style={styles.resultSubtitle}>
+                                Nærmeste indgang markeret med orange prik
+                              </Text>
+                            ) : (
+                              <Text style={styles.resultSubtitle}>
+                                Ingen indgang fundet – viser kun lokalet
+                              </Text>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Text style={styles.resultTitle}>
+                              Viser {displayedFloor.floor.originalName}
+                            </Text>
+                            <Text style={styles.resultSubtitle}>
+                              Ingen søgning endnu – stueetagen vises som udgangspunkt.
+                            </Text>
+                          </>
+                        )}
+                        <FloorViewer
+                          buildingKey={selectedBuildingKey!}
+                          floorKey={displayedFloor.floorKey}
+                          floorName={displayedFloor.floor.originalName}
+                          room={displayedFloor.room}
+                          entrance={displayedFloor.entrance}
+                        />
+                      </View>
+                    ) : (
+                      <View style={styles.placeholder}>
+                        <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
+                        <Text style={styles.placeholderSubtitle}>
+                          Vi viser automatisk den rigtige etage og markerer lokalet med grønt.
+                        </Text>
+                      </View>
+                    )}
+
+                    {roomSuggestions.length > 0 ? (
+                      <View style={styles.suggestionContainer}>
+                        <Text style={styles.suggestionLabel}>Populære lokaler</Text>
+                        <View style={styles.suggestionRow}>
+                          {roomSuggestions.map((roomId: string) => (
+                            <Pressable
+                              key={roomId}
+                              onPress={() => handleSuggestionPress(roomId)}
+                              style={styles.suggestionChip}
+                            >
+                              <Text style={styles.suggestionText}>{roomId}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
                   </View>
                 )}
-
-                {roomSuggestions.length > 0 ? (
-                  <View style={styles.suggestionContainer}>
-                    <Text style={styles.suggestionLabel}>Populære lokaler</Text>
-                    <View style={styles.suggestionRow}>
-                      {roomSuggestions.map((roomId: string) => (
-                        <Pressable
-                          key={roomId}
-                          onPress={() => handleSuggestionPress(roomId)}
-                          style={styles.suggestionChip}
-                        >
-                          <Text style={styles.suggestionText}>{roomId}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
+              </View>
+            </ScrollView>
+          ) : activeTab === 'institutions' ? (
+            <ScrollView contentContainerStyle={styles.sectionContent}>
+              <View style={styles.institutionSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitleLarge}>Skift institution</Text>
+                  <Text style={styles.sectionSubtitleMuted}>
+                    Vælg hvilken organisation du vil se lokaler for. Mock-data for Novo Nordisk og andre er klar
+                    til test.
+                  </Text>
+                </View>
+                <View style={styles.institutionList}>
+                  {institutionOptions.map((institution) => {
+                    const isActive = selectedInstitution?.id === institution.id;
+                    return (
+                      <Pressable
+                        key={institution.id}
+                        accessibilityRole="button"
+                        onPress={() => setSelectedInstitutionId(institution.id)}
+                        style={({ pressed }) => [
+                          styles.institutionCard,
+                          isActive ? styles.institutionCardActive : null,
+                          pressed ? styles.institutionCardPressed : null,
+                        ]}
+                      >
+                        <View style={styles.institutionCardContent}>
+                          <View style={styles.institutionText}>
+                            <Text style={styles.institutionName}>{institution.name}</Text>
+                            <Text style={styles.institutionMeta}>
+                              {institution.organization} • {institution.region}
+                            </Text>
+                            <View style={styles.institutionBadges}>
+                              {institution.campuses.map((campus) => (
+                                <View key={campus} style={styles.institutionBadge}>
+                                  <Text style={styles.institutionBadgeText}>{campus}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                          <Ionicons
+                            name={isActive ? 'checkmark-circle' : 'business-outline'}
+                            size={22}
+                            color={isActive ? '#2563eb' : '#94a3b8'}
+                          />
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedInstitution ? (
+                  <View style={styles.institutionDetails}>
+                    <Text style={styles.institutionDetailsTitle}>Aktiv institution</Text>
+                    <Text style={styles.institutionDetailsName}>{selectedInstitution.name}</Text>
+                    <Text style={styles.institutionDetailsDescription}>
+                      {selectedInstitution.organization} • {selectedInstitution.region}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.institutionAction}
+                      onPress={() => {
+                        handleBack();
+                        setActiveTab('home');
+                      }}
+                    >
+                      <Ionicons name="navigate-outline" size={18} color="#ffffff" />
+                      <Text style={styles.institutionActionLabel}>
+                        Skift til {selectedInstitution.name}
+                      </Text>
+                    </Pressable>
                   </View>
                 ) : null}
               </View>
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            </ScrollView>
+          ) : (
+            <ScrollView contentContainerStyle={styles.sectionContent}>
+              <View style={styles.settingsSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitleLarge}>Indstillinger</Text>
+                  <Text style={styles.sectionSubtitleMuted}>
+                    Tilpas WayInn-oplevelsen. Indstillingerne er mock-data og bliver ikke gemt endnu.
+                  </Text>
+                </View>
+                <View style={styles.settingsCard}>
+                  <View style={styles.settingsRow}>
+                    <View style={styles.settingsRowText}>
+                      <Text style={styles.settingsOption}>Notifikationer</Text>
+                      <Text style={styles.settingsDescription}>
+                        Få besked når lokaler flyttes eller ændres.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={notificationsEnabled}
+                      onValueChange={setNotificationsEnabled}
+                      trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                      thumbColor={notificationsEnabled ? '#2563eb' : '#f1f5f9'}
+                    />
+                  </View>
+                  <View style={styles.settingsDivider} />
+                  <View style={styles.settingsRow}>
+                    <View style={styles.settingsRowText}>
+                      <Text style={styles.settingsOption}>Kalender-sync</Text>
+                      <Text style={styles.settingsDescription}>
+                        Synkronisér møder fra din kalender automatisk.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={calendarSyncEnabled}
+                      onValueChange={setCalendarSyncEnabled}
+                      trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                      thumbColor={calendarSyncEnabled ? '#2563eb' : '#f1f5f9'}
+                    />
+                  </View>
+                  <View style={styles.settingsDivider} />
+                  <View style={styles.settingsRow}>
+                    <View style={styles.settingsRowText}>
+                      <Text style={styles.settingsOption}>Mørkt tema</Text>
+                      <Text style={styles.settingsDescription}>
+                        Reducér lysstyrke og gør kortene mørke.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={darkModeEnabled}
+                      onValueChange={setDarkModeEnabled}
+                      trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                      thumbColor={darkModeEnabled ? '#2563eb' : '#f1f5f9'}
+                    />
+                  </View>
+                </View>
+                <View style={styles.settingsInfo}>
+                  <Ionicons name="information-circle-outline" size={20} color="#2563eb" />
+                  <Text style={styles.settingsInfoText}>
+                    Flere indstillinger er på vej – giv besked hvis du har ønsker til funktioner.
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+          )}
+        </KeyboardAvoidingView>
+        <View style={styles.tabBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setActiveTab('home')}
+            style={({ pressed }) => [
+              styles.tabButton,
+              activeTab === 'home' ? styles.tabButtonActive : null,
+              pressed ? styles.tabButtonPressed : null,
+            ]}
+          >
+            <Ionicons
+              name={activeTab === 'home' ? 'home' : 'home-outline'}
+              size={22}
+              color={activeTab === 'home' ? '#2563eb' : '#94a3b8'}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'home' ? styles.tabLabelActive : null]}>Hjem</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setActiveTab('institutions')}
+            style={({ pressed }) => [
+              styles.tabButton,
+              activeTab === 'institutions' ? styles.tabButtonActive : null,
+              pressed ? styles.tabButtonPressed : null,
+            ]}
+          >
+            <Ionicons
+              name={activeTab === 'institutions' ? 'business' : 'business-outline'}
+              size={22}
+              color={activeTab === 'institutions' ? '#2563eb' : '#94a3b8'}
+            />
+            <Text
+              style={[styles.tabLabel, activeTab === 'institutions' ? styles.tabLabelActive : null]}
+            >
+              Institutioner
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setActiveTab('settings')}
+            style={({ pressed }) => [
+              styles.tabButton,
+              activeTab === 'settings' ? styles.tabButtonActive : null,
+              pressed ? styles.tabButtonPressed : null,
+            ]}
+          >
+            <Ionicons
+              name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
+              size={22}
+              color={activeTab === 'settings' ? '#2563eb' : '#94a3b8'}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'settings' ? styles.tabLabelActive : null]}>
+              Indstillinger
+            </Text>
+          </Pressable>
+        </View>
+      </View>
       <Modal
         visible={quickLookupInfoVisible}
         animationType="fade"
@@ -532,9 +779,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  screen: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
   scrollContent: {
     flexGrow: 1,
     padding: 24,
+    paddingBottom: 160,
   },
   keyboardAvoider: {
     flex: 1,
@@ -560,12 +812,124 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
   },
+  titleAccent: {
+    color: '#1d4ed8',
+  },
   subtitle: {
     color: '#64748b',
     fontSize: 16,
   },
   landing: {
     gap: 28,
+  },
+  sectionContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 160,
+    gap: 24,
+  },
+  sectionHeader: {
+    gap: 8,
+  },
+  sectionTitleLarge: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  sectionSubtitleMuted: {
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  institutionSection: {
+    gap: 24,
+  },
+  institutionList: {
+    gap: 12,
+  },
+  institutionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  institutionCardActive: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  institutionCardPressed: {
+    opacity: 0.9,
+  },
+  institutionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    gap: 16,
+  },
+  institutionText: {
+    flex: 1,
+    gap: 8,
+  },
+  institutionName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  institutionMeta: {
+    color: '#475467',
+  },
+  institutionBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  institutionBadge: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  institutionBadgeText: {
+    color: '#0369a1',
+    fontWeight: '600',
+  },
+  institutionDetails: {
+    gap: 12,
+    padding: 20,
+    borderRadius: 18,
+    backgroundColor: '#0f172a',
+  },
+  institutionDetailsTitle: {
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
+  institutionDetailsName: {
+    color: '#f8fafc',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  institutionDetailsDescription: {
+    color: '#e2e8f0',
+  },
+  institutionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+  },
+  institutionActionLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
   quickLookupCard: {
     gap: 12,
@@ -692,6 +1056,85 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: '#0369a1',
     fontWeight: '600',
+  },
+  settingsSection: {
+    gap: 24,
+  },
+  settingsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    padding: 20,
+    gap: 20,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  settingsRowText: {
+    flex: 1,
+    gap: 4,
+  },
+  settingsOption: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  settingsDescription: {
+    color: '#64748b',
+    lineHeight: 18,
+  },
+  settingsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#e2e8f0',
+  },
+  settingsInfo: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    backgroundColor: '#e0f2fe',
+    padding: 16,
+    borderRadius: 16,
+  },
+  settingsInfoText: {
+    flex: 1,
+    color: '#0f172a',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.select({ ios: 24, default: 16 }),
+    backgroundColor: '#ffffff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  tabButtonActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  tabButtonPressed: {
+    opacity: 0.85,
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  tabLabelActive: {
+    color: '#2563eb',
   },
   resultCard: {
     gap: 16,
