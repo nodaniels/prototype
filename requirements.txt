@@ -18,3 +18,9 @@ regex==2023.10.3
 # pip install PyMuPDF Pillow regex
 
 # Note: tkinter comes with Python by default on most systems
+
+# Optional: HTTP client used for pushing JSON to Firebase from the exporter
+requests==2.31.0
+
+# Admin SDK for server-side Firebase writes (optional)
+firebase-admin==6.1.0

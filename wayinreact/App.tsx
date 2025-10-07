@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -15,7 +15,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
-import buildingsPayload from './src/data/buildings.json';
+import { FIREBASE_DB_URL, FIREBASE_AUTH } from './src/config';
 import type {
   BuildingData,
   BuildingsPayload,
@@ -28,15 +28,44 @@ import { BuildingPicker } from './src/components/BuildingPicker';
 import { FloorViewer } from './src/components/FloorViewer';
 import { listRoomIds, searchRoomInBuilding } from './src/utils/search';
 
-const typedPayload = buildingsPayload as BuildingsPayload;
+// Empty fallback payload used until remote or local data is loaded
+const emptyPayload: BuildingsPayload = { buildings: {} } as BuildingsPayload;
 
-const buildingCodeMap: Record<string, keyof typeof typedPayload.buildings> = {
+// App will hold the active payload in state and try to fetch remote data on mount.
+
+// At startup we'll attempt to fetch a remote buildings payload from the Firebase Realtime DB.
+// If that fails we fall back to the local JSON bundled with the app.
+const fetchRemoteBuildings = async (): Promise<BuildingsPayload | null> => {
+  try {
+    const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/buildings.json`;
+    const params = FIREBASE_AUTH ? `?auth=${encodeURIComponent(FIREBASE_AUTH)}` : '';
+    const resp = await fetch(url + params, { cache: 'no-store' });
+    if (!resp.ok) {
+      console.warn('Failed to fetch remote buildings:', resp.status, await resp.text());
+      return null;
+    }
+    const data = await resp.json();
+    // Basic validation: must have buildings key
+    if (!data || typeof data !== 'object' || !data.buildings) {
+      console.warn('Remote buildings payload invalid');
+      return null;
+    }
+    return data as BuildingsPayload;
+  } catch (err) {
+    console.warn('Error fetching remote buildings:', err);
+    return null;
+  }
+};
+
+// NOTE: payload will be populated at runtime (remote or local fallback). We use
+// `typedPayloadFallback` for initial typing; the runtime `payload` state holds the active data.
+const buildingCodeMap: Record<string, string> = {
   SP: 'solbjerg',
   PH: 'porcelaenshaven',
 };
 
 const createCandidatesFromLocation = (
-  buildingKey: keyof typeof typedPayload.buildings,
+  buildingKey: string,
   token: string,
 ): string[] => {
   const candidates: string[] = [];
@@ -139,6 +168,7 @@ const isGroundFloor = (key: string, floor: FloorData) => {
 
 const App: React.FC = () => {
   const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null);
+  const [payload, setPayload] = useState<BuildingsPayload>(emptyPayload);
   const [searchQuery, setSearchQuery] = useState('');
   const [displayedFloor, setDisplayedFloor] = useState<DisplayedFloor | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -146,6 +176,35 @@ const App: React.FC = () => {
   const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
   const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+
+  // On mount, try to fetch remote payload and replace local data if successful.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await fetchRemoteBuildings();
+      if (remote && !cancelled) {
+        setPayload(remote);
+        return;
+      }
+
+      // remote failed — attempt to dynamically load the local JSON fallback if present
+      try {
+        // dynamic import keeps bundler from requiring the file at build-time
+        const localModule = await import('./src/data/buildings.json');
+        const localData = (localModule && (localModule.default ?? localModule)) as BuildingsPayload;
+        if (localData && !cancelled) {
+          setPayload(localData);
+          return;
+        }
+      } catch (err) {
+        // local fallback not present or failed to load — keep empty payload
+        console.warn('Local buildings.json fallback not available or failed to load:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const institutionOptions = useMemo<InstitutionOption[]>(
     () => [
@@ -189,17 +248,17 @@ const App: React.FC = () => {
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
-    return Object.entries(typedPayload.buildings).map(([key, value]) => ({
+    return Object.entries(payload.buildings).map(([key, value]) => ({
       key,
-      data: value,
-      name: value.originalName
+      data: value as BuildingData,
+      name: (value as BuildingData).originalName
         .replace(/_/g, ' ')
         .replace(/\b\w/g, (match) => match.toUpperCase()),
     }));
-  }, []);
+  }, [payload]);
 
   const selectedBuilding: BuildingData | null = selectedBuildingKey
-    ? typedPayload.buildings[selectedBuildingKey]
+    ? (payload.buildings[selectedBuildingKey] as BuildingData)
     : null;
 
   const roomSuggestions = useMemo(() => {
@@ -210,13 +269,13 @@ const App: React.FC = () => {
   }, [selectedBuilding]);
 
   const searchAcrossBuildings = useCallback(
-    (query: string): { buildingKey: string; result: SearchResult } | null => {
+  (query: string): { buildingKey: string; result: SearchResult } | null => {
       const normalized = query.trim().toUpperCase();
       if (!normalized) {
         return null;
       }
-      for (const [buildingKey, building] of Object.entries(typedPayload.buildings)) {
-        const match = searchRoomInBuilding(building, normalized);
+      for (const [buildingKey, building] of Object.entries(payload.buildings)) {
+        const match = searchRoomInBuilding(building as BuildingData, normalized);
         if (match) {
           return { buildingKey, result: match };
         }
@@ -245,7 +304,7 @@ const App: React.FC = () => {
 
           const remainder = locationValueRaw.slice(codeIndex + code.length).trim();
           const primaryToken = remainder.split(/\s+/)[0] ?? '';
-          const building = typedPayload.buildings[buildingKey];
+          const building = payload.buildings[buildingKey] as BuildingData;
           if (!building) {
             continue;
           }
@@ -319,7 +378,7 @@ const App: React.FC = () => {
     setErrorMessage(null);
     setQuickLookupError(null);
 
-    const building = typedPayload.buildings[key];
+    const building = payload.buildings[key] as BuildingData | undefined;
     if (!building) {
       setDisplayedFloor(null);
       return;
