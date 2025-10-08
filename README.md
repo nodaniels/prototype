@@ -1,3 +1,10 @@
+# Projektets Arbejdsfordeling
+
+Noah: Defineret tech stacken, og bygget Python script til at ekspotere PDF'er til JSON data.
+Viggo: Database logik. Gjort sådan at Json dataen ligger i Databasen, og man derefter puller den i react appen
+Christian: React navigation og komponent opbygning
+Marcus: Repository struktur, samt ændringer i ui.
+
 # Prototype setup
 
 ## Dependencies
