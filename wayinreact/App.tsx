@@ -188,18 +188,7 @@ const App: React.FC = () => {
       }
 
       // remote failed — attempt to dynamically load the local JSON fallback if present
-      try {
-        // dynamic import keeps bundler from requiring the file at build-time
-        const localModule = await import('./src/data/buildings.json');
-        const localData = (localModule && (localModule.default ?? localModule)) as BuildingsPayload;
-        if (localData && !cancelled) {
-          setPayload(localData);
-          return;
-        }
-      } catch (err) {
-        // local fallback not present or failed to load — keep empty payload
-        console.warn('Local buildings.json fallback not available or failed to load:', err);
-      }
+      // Remote fetch failed; leave payload empty until data becomes available.
     })();
     return () => {
       cancelled = true;
