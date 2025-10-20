@@ -271,7 +271,7 @@ const App: React.FC = () => {
       }
       return null;
     },
-    [],
+    [payload],
   );
 
   const extractRoomFromText = useCallback(
@@ -325,7 +325,7 @@ const App: React.FC = () => {
 
       return null;
     },
-    [searchAcrossBuildings],
+    [payload, searchAcrossBuildings],
   );
 
   const applySearchResult = useCallback(
@@ -387,7 +387,7 @@ const App: React.FC = () => {
     } else {
       setDisplayedFloor(null);
     }
-  }, []);
+  }, [payload]);
 
   const handleSearch = useCallback(() => {
     const trimmedQuery = searchQuery.trim();
