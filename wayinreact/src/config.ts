@@ -9,7 +9,7 @@ try {
 	const extra = Constants?.manifest?.extra ?? Constants?.expoConfig?.extra;
 	dbUrl = extra?.FIREBASE_DB_URL ?? extra?.firebase?.dbUrl;
 	authToken = extra?.FIREBASE_AUTH ?? null;
-} catch (err) {
+} catch {
 	// Not running in Expo or Constants not available
 }
 
