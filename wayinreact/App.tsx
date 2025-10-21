@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as Calendar from 'expo-calendar';
 
 import { FIREBASE_DB_URL, FIREBASE_AUTH } from './src/config';
 import type {
@@ -67,6 +69,8 @@ const buildingCodeMap: Record<string, string> = {
 const createCandidatesFromLocation = (
   buildingKey: string,
   token: string,
+  context?: string,
+  buildingCode?: string,
 ): string[] => {
   const candidates: string[] = [];
   const pushCandidate = (value?: string | null) => {
@@ -84,24 +88,58 @@ const createCandidatesFromLocation = (
   };
 
   const normalizedToken = token.trim().toUpperCase();
-  if (!normalizedToken) {
+  const contextTokens = (() => {
+    if (!context) {
+      return normalizedToken ? [normalizedToken] : [];
+    }
+    const extracted = context
+      .split(/[\s,.;:()•-]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => part.toUpperCase());
+    if (normalizedToken) {
+      extracted.unshift(normalizedToken);
+    }
+    return Array.from(new Set(extracted)).slice(0, 5);
+  })();
+
+  if (!contextTokens.length) {
     return candidates;
   }
 
   if (buildingKey === 'solbjerg') {
-    const primary = normalizedToken.replace(/[^A-Z0-9]/g, '');
-    if (primary) {
-      pushCandidate(primary);
-      const digitsOnly = primary.replace(/\D/g, '');
-      if (digitsOnly && digitsOnly !== primary) {
-        pushCandidate(digitsOnly);
+    const addVariants = (raw: string) => {
+      const sanitized = raw.replace(/[^A-Z0-9]/g, '');
+      if (!sanitized) {
+        return;
       }
+      pushCandidate(sanitized);
+
+      if (buildingCode) {
+        pushCandidate(`${buildingCode}${sanitized}`);
+      }
+
+      const digitsOnly = sanitized.replace(/\D/g, '');
+      if (digitsOnly) {
+        pushCandidate(digitsOnly);
+        if (buildingCode) {
+          pushCandidate(`${buildingCode}${digitsOnly}`);
+        }
+      }
+    };
+
+    contextTokens.forEach(addVariants);
+
+    for (let i = 0; i < contextTokens.length - 1; i += 1) {
+      const combined = `${contextTokens[i]}${contextTokens[i + 1]}`;
+      addVariants(combined);
     }
     return candidates;
   }
 
   if (buildingKey === 'porcelaenshaven') {
-    const sanitized = normalizedToken.replace(/[^A-Z0-9.]/g, '.');
+    const primaryToken = contextTokens[0] ?? '';
+    const sanitized = primaryToken.replace(/[^A-Z0-9.]/g, '.');
     const segments = sanitized.split('.').filter(Boolean);
     const numericSegments = segments.map((segment) => segment.replace(/\D/g, '')).filter(Boolean);
     let relevantSegments = numericSegments;
@@ -126,10 +164,19 @@ const createCandidatesFromLocation = (
       pushCandidate(roomPart);
     }
 
+    contextTokens.slice(1, 3).forEach((part) => {
+      const cleaned = part.replace(/[^A-Z0-9.]/g, '');
+      if (cleaned) {
+        pushCandidate(cleaned);
+      }
+    });
+
     return candidates;
   }
 
-  pushCandidate(normalizedToken.replace(/[^A-Z0-9]/g, ''));
+  contextTokens.forEach((value) => {
+    pushCandidate(value.replace(/[^A-Z0-9]/g, ''));
+  });
   return candidates;
 };
 
@@ -141,6 +188,15 @@ interface InstitutionOption {
   organization: string;
   region: string;
   campuses: string[];
+}
+
+type PermissionState = 'undetermined' | 'granted' | 'denied';
+
+interface CalendarEventSummary {
+  id: string;
+  title: string;
+  startDate: Date;
+  location?: string | null;
 }
 
 interface BuildingEntry {
@@ -176,6 +232,59 @@ const App: React.FC = () => {
   const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
   const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const [calendarPermissionStatus, setCalendarPermissionStatus] =
+    useState<PermissionState>('undetermined');
+  const [calendarLookupLoading, setCalendarLookupLoading] = useState(false);
+  const [calendarLookupError, setCalendarLookupError] = useState<string | null>(null);
+  const [calendarLookupMessage, setCalendarLookupMessage] = useState<string | null>(null);
+  const [calendarLastEvent, setCalendarLastEvent] = useState<CalendarEventSummary | null>(null);
+
+  const refreshCalendarPermission = useCallback(async () => {
+    try {
+      const response = await Calendar.getCalendarPermissionsAsync();
+      setCalendarPermissionStatus(response.status as PermissionState);
+    } catch (error) {
+      console.warn('Failed to read calendar permission status', error);
+      setCalendarPermissionStatus('denied');
+    }
+  }, []);
+
+  const ensureCalendarAccess = useCallback(async () => {
+    try {
+      const current = await Calendar.getCalendarPermissionsAsync();
+      setCalendarPermissionStatus(current.status as PermissionState);
+      if (current.status === 'granted') {
+        setCalendarLookupError(null);
+        return true;
+      }
+
+      if (current.status === 'denied' && !current.canAskAgain) {
+        setCalendarLookupMessage(null);
+        setCalendarLookupError(
+          'WayInn mangler adgang til din kalender. Aktivér tilladelsen i Indstillinger.',
+        );
+        return false;
+      }
+
+      const requested = await Calendar.requestCalendarPermissionsAsync();
+      setCalendarPermissionStatus(requested.status as PermissionState);
+      if (requested.status !== 'granted') {
+        setCalendarLookupMessage(null);
+        setCalendarLookupError(
+          'WayInn fik ikke adgang til kalenderen. Åbn Indstillinger for at aktivere tilladelsen.',
+        );
+        return false;
+      }
+
+      setCalendarLookupError(null);
+      return true;
+    } catch (error) {
+      console.warn('Calendar permission error', error);
+      setCalendarLookupMessage(null);
+      setCalendarLookupError('Der opstod en fejl ved anmodning om kalenderadgang.');
+      return false;
+    }
+  }, []);
 
   // On mount, try to fetch remote payload and replace local data if successful.
   useEffect(() => {
@@ -194,6 +303,12 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      await refreshCalendarPermission();
+    })();
+  }, [refreshCalendarPermission]);
 
   const institutionOptions = useMemo<InstitutionOption[]>(
     () => [
@@ -231,6 +346,21 @@ const App: React.FC = () => {
       null
     );
   }, [institutionOptions, selectedInstitutionId]);
+
+  const calendarLastEventSummary = useMemo(() => {
+    if (!calendarLastEvent) {
+      return null;
+    }
+    const formatted = calendarLastEvent.startDate.toLocaleString('da-DK', {
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const locationPart = calendarLastEvent.location?.trim()
+      ? ` • ${calendarLastEvent.location.trim()}`
+      : '';
+    return `${formatted}${locationPart}`;
+  }, [calendarLastEvent]);
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
@@ -298,7 +428,12 @@ const App: React.FC = () => {
             continue;
           }
 
-          const candidates = createCandidatesFromLocation(buildingKey, primaryToken);
+          const candidates = createCandidatesFromLocation(
+            buildingKey,
+            primaryToken,
+            remainder,
+            code,
+          );
           for (const candidate of candidates) {
             const match = searchRoomInBuilding(building, candidate);
             if (match) {
@@ -315,10 +450,52 @@ const App: React.FC = () => {
 
       const tokens = input.match(/[A-ZÆØÅ0-9._-]+/gi);
       if (tokens) {
-        for (const token of tokens) {
-          const match = searchAcrossBuildings(token);
-          if (match) {
-            return match;
+        for (const rawToken of tokens) {
+          const normalizedToken = rawToken.trim().toUpperCase();
+          if (!normalizedToken) {
+            continue;
+          }
+
+          const variants = new Set<string>([normalizedToken]);
+          const sanitized = normalizedToken.replace(/[^A-Z0-9]/g, '');
+          if (sanitized) {
+            variants.add(sanitized);
+            const digitsOnly = sanitized.replace(/\D/g, '');
+            if (digitsOnly) {
+              variants.add(digitsOnly);
+            }
+            const withoutPrefix = sanitized.replace(/^[A-Z]{1,3}/, '');
+            if (withoutPrefix && withoutPrefix !== sanitized) {
+              variants.add(withoutPrefix);
+            }
+          }
+
+          for (const [code, buildingKey] of Object.entries(buildingCodeMap)) {
+            const building = payload.buildings[buildingKey] as BuildingData | undefined;
+            if (!building) {
+              continue;
+            }
+            if (normalizedToken.startsWith(code)) {
+              const remainder = normalizedToken.slice(code.length).trim();
+              if (remainder) {
+                variants.add(remainder);
+                variants.add(remainder.replace(/[^A-Z0-9]/g, ''));
+              }
+            }
+            const locationVariants = createCandidatesFromLocation(
+              buildingKey,
+              normalizedToken,
+              normalizedToken,
+              code,
+            );
+            locationVariants.forEach((variant) => variants.add(variant));
+          }
+
+          for (const variant of variants) {
+            const match = searchAcrossBuildings(variant);
+            if (match) {
+              return match;
+            }
           }
         }
       }
@@ -360,6 +537,123 @@ const App: React.FC = () => {
     setQuickLookupError(null);
     applySearchResult(match.buildingKey, match.result);
   }, [applySearchResult, extractRoomFromText, quickLookupValue]);
+
+  const handleCalendarLookup = useCallback(async () => {
+    setCalendarLookupError(null);
+    setCalendarLookupMessage('Finder næste kalenderaftale...');
+    setCalendarLookupLoading(true);
+    try {
+      const hasAccess = await ensureCalendarAccess();
+      if (!hasAccess) {
+        setCalendarLookupMessage(null);
+        return;
+      }
+
+      const now = new Date();
+      const end = new Date(now.getTime() + 1000 * 60 * 60 * 48);
+      const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const calendarIds = calendars.map((calendar) => calendar.id).filter(Boolean);
+      if (!calendarIds.length) {
+        setCalendarLookupMessage(null);
+        setCalendarLastEvent(null);
+        setCalendarLookupError('Ingen kalendere fundet på enheden.');
+        return;
+      }
+
+      const eventsArrays = await Promise.all(
+        calendarIds.map(async (id) => {
+          try {
+            return await Calendar.getEventsAsync([id], now, end);
+          } catch (error) {
+            console.warn(`Failed to fetch events for calendar ${id}`, error);
+            return [];
+          }
+        }),
+      );
+
+      const eventsWithStart = eventsArrays
+        .flat()
+        .map((event) => ({
+          event,
+          startDate: event.startDate ? new Date(event.startDate) : null,
+        }))
+        .filter(({ startDate }) => startDate && startDate.getTime() >= now.getTime())
+        .sort((a, b) => (a.startDate!.getTime() - b.startDate!.getTime()));
+
+      const nextWrapper = eventsWithStart[0];
+      if (!nextWrapper) {
+        setCalendarLookupMessage(null);
+        setCalendarLastEvent(null);
+        setCalendarLookupError('Ingen kommende møder de næste 48 timer.');
+        return;
+      }
+
+      const nextEvent = nextWrapper.event;
+      const eventStartDate = nextWrapper.startDate ?? new Date();
+      const eventSummary: CalendarEventSummary = {
+        id: nextEvent.id,
+        title: nextEvent.title?.trim() || 'Ukendt aftale',
+        startDate: eventStartDate,
+        location: nextEvent.location,
+      };
+      setCalendarLastEvent(eventSummary);
+
+      const candidateTexts = [nextEvent.location, nextEvent.notes, nextEvent.title].filter(
+        (value): value is string => !!value && value.trim().length > 0,
+      );
+
+      for (const text of candidateTexts) {
+        const match = extractRoomFromText(text);
+        if (match) {
+          applySearchResult(match.buildingKey, match.result);
+          const formattedTime = eventStartDate.toLocaleString('da-DK', {
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          setCalendarLookupMessage(
+            `Viser lokale fra kalenderaftalen "${eventSummary.title}" (${formattedTime}).`,
+          );
+          setCalendarLookupError(null);
+          return;
+        }
+      }
+
+      const formattedTime = eventStartDate.toLocaleString('da-DK', {
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      setCalendarLookupMessage(
+        `Næste aftale "${eventSummary.title}" (${formattedTime}), men ingen lokale-information fundet.`,
+      );
+      setCalendarLookupError('Tilføj lokalenummer i kalenderaftalen for at finde det automatisk.');
+    } catch (error) {
+      console.warn('Calendar lookup failed', error);
+      setCalendarLookupMessage(null);
+      setCalendarLookupError('Noget gik galt under opslag i kalenderen.');
+    } finally {
+      setCalendarLookupLoading(false);
+    }
+  }, [applySearchResult, ensureCalendarAccess, extractRoomFromText]);
+
+  const handleToggleCalendarSync = useCallback(
+    async (value: boolean) => {
+      setCalendarSyncEnabled(value);
+      if (!value) {
+        setCalendarLookupMessage(null);
+        setCalendarLookupError(null);
+        setCalendarLastEvent(null);
+        return;
+      }
+
+      const granted = await ensureCalendarAccess();
+      if (!granted) {
+        setCalendarSyncEnabled(false);
+      }
+    },
+    [ensureCalendarAccess],
+  );
 
   const handleSelectBuilding = useCallback((key: string) => {
     setSelectedBuildingKey(key);
@@ -442,6 +736,19 @@ const App: React.FC = () => {
     setQuickLookupError(null);
   }, []);
 
+  useEffect(() => {
+    if (__DEV__) {
+      const sample = extractRoomFromText('Kalender: møde i lokale S10 (SP)');
+      if (!sample) {
+        console.warn('Dev check: eksempeltekst kunne ikke kortlægges til et lokale.');
+      }
+      const candidateProbe = createCandidatesFromLocation('solbjerg', 's14', 's14 PA', 'SP');
+      if (!candidateProbe.includes('SPS14')) {
+        console.warn('Dev check: forventet kandidat SPS14 mangler i createCandidatesFromLocation.');
+      }
+    }
+  }, [extractRoomFromText]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
@@ -492,10 +799,44 @@ const App: React.FC = () => {
                         onSubmitEditing={handleQuickLookup}
                         blurOnSubmit
                       />
-                      <Pressable style={styles.quickLookupButton} onPress={handleQuickLookup}>
-                        <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
-                      </Pressable>
+                      <View style={styles.quickLookupActions}>
+                        <Pressable style={styles.quickLookupButton} onPress={handleQuickLookup}>
+                          <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={calendarLookupLoading}
+                          onPress={handleCalendarLookup}
+                          style={({ pressed }) => [
+                            styles.quickLookupCalendarButton,
+                            calendarLookupLoading ? styles.quickLookupCalendarButtonDisabled : null,
+                            pressed && !calendarLookupLoading
+                              ? styles.quickLookupCalendarButtonPressed
+                              : null,
+                          ]}
+                        >
+                          {calendarLookupLoading ? (
+                            <ActivityIndicator color="#ffffff" size="small" />
+                          ) : (
+                            <Ionicons name="calendar-outline" size={16} color="#ffffff" />
+                          )}
+                          <Text style={styles.quickLookupCalendarButtonLabel}>
+                            {calendarPermissionStatus === 'granted'
+                              ? 'Brug næste møde'
+                              : 'Tillad kalender'}
+                          </Text>
+                        </Pressable>
+                      </View>
                       {quickLookupError ? <Text style={styles.error}>{quickLookupError}</Text> : null}
+                      {calendarLookupError ? <Text style={styles.error}>{calendarLookupError}</Text> : null}
+                      {calendarLookupMessage ? (
+                        <Text style={styles.quickLookupHint}>{calendarLookupMessage}</Text>
+                      ) : null}
+                      {calendarLastEvent && calendarLastEventSummary ? (
+                        <Text style={styles.quickLookupHint}>
+                          Seneste kalenderaftale: {calendarLastEvent.title} ({calendarLastEventSummary})
+                        </Text>
+                      ) : null}
                     </View>
 
                     <View style={styles.buildingPickerSection}>
@@ -700,7 +1041,13 @@ const App: React.FC = () => {
                     </View>
                     <Switch
                       value={calendarSyncEnabled}
-                      onValueChange={setCalendarSyncEnabled}
+                      onValueChange={async (value) => {
+                        try {
+                          await handleToggleCalendarSync(value);
+                        } catch (error) {
+                          console.warn('Kalender-sync toggle mislykkedes', error);
+                        }
+                      }}
                       trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
                       thumbColor={calendarSyncEnabled ? '#2563eb' : '#f1f5f9'}
                     />
@@ -1024,6 +1371,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#0f172a',
   },
+  quickLookupActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   quickLookupButton: {
     alignSelf: 'flex-start',
     backgroundColor: '#2563eb',
@@ -1032,6 +1384,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   quickLookupButtonLabel: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  quickLookupCalendarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  quickLookupCalendarButtonDisabled: {
+    opacity: 0.7,
+  },
+  quickLookupCalendarButtonPressed: {
+    opacity: 0.85,
+  },
+  quickLookupCalendarButtonLabel: {
     color: '#ffffff',
     fontWeight: '600',
   },
