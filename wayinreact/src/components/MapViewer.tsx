@@ -21,12 +21,12 @@ interface BuildingMapConfig {
 
 const BUILDING_MAP_CONFIGS: Record<string, BuildingMapConfig> = {
   porcelaenshaven: {
-    latitude: 55.67782960379468,
-    longitude: 12.522188107330045,
+    latitude: 55.67797960379468,
+    longitude: 12.522188107350989,
     latitudeDelta: 0.001,
     longitudeDelta: 0.001,
     pitch: 0,
-    heading: 275,
+    heading: 277.8,
     altitude: 400,
     zoom: 20,
   },
@@ -131,6 +131,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
       <MapView
         provider={PROVIDER_DEFAULT}
         style={styles.map}
+        mapType="satellite"
         initialRegion={{
           latitude: buildingConfig.latitude,
           longitude: buildingConfig.longitude,
@@ -159,19 +160,11 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
         scrollEnabled
         zoomEnabled
       />
-      </MapView>
       {errorMessage && !permissionGranted ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
           <Text style={styles.errorBannerSubtext}>
             Aktivér lokationstjenester i Indstillinger for at se din position.
-          </Text>
-        </View>
-      ) : null}
-      {permissionGranted && userLocation ? (
-        <View style={styles.infoBanner}>
-          <Text style={styles.infoBannerText}>
-            📍 Din lokation opdateres automatisk
           </Text>
         </View>
       ) : null}
