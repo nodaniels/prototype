@@ -158,16 +158,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
         pitchEnabled
         scrollEnabled
         zoomEnabled
-      >
-        <Marker
-          coordinate={{
-            latitude: buildingConfig.latitude,
-            longitude: buildingConfig.longitude,
-          }}
-          title={buildingName}
-          description="Bygningens lokation"
-          pinColor="#2563eb"
-        />
+      />
       </MapView>
       {errorMessage && !permissionGranted ? (
         <View style={styles.errorBanner}>
