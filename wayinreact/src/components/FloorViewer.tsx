@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Image, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { floorImages } from '../data/floorImages';
 import type { Entrance, Room } from '../types';
+import { MapViewer } from './MapViewer';
 
 interface FloorViewerProps {
   buildingKey: string;
@@ -39,6 +41,7 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
 }: FloorViewerProps) => {
   const source = images[buildingKey]?.[floorKey];
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
+  const [showMap, setShowMap] = useState(false);
 
   const floorLabel = useMemo(() => {
     const normalized = floorName.replace(/_/g, ' ').trim();
@@ -56,6 +59,14 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
     }
     return computeAspectRatio(source);
   }, [source]);
+
+  const buildingDisplayName = useMemo(() => {
+    const nameMap: Record<string, string> = {
+      porcelaenshaven: 'Porcelænshaven',
+      solbjerg: 'Solbjerg Plads',
+    };
+    return nameMap[buildingKey] || buildingKey;
+  }, [buildingKey]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width } = event.nativeEvent.layout;
@@ -100,34 +111,55 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
           ) : null}
         </View>
       ) : null}
-      <View style={[styles.viewer, { aspectRatio }]} onLayout={handleLayout}>
-        <Image source={source} style={styles.image} resizeMode="contain" />
-        {dimensions.width > 0 ? (
-          <>
-            {showRoom && room ? (
-              <View
-                style={[
-                  styles.marker,
-                  styles.roomDot,
-                  computePosition(dimensions, room),
-                ]}
-              />
-            ) : null}
-            {showEntrance && entrance ? (
-              <View
-                style={[
-                  styles.marker,
-                  styles.entranceDot,
-                  computePosition(dimensions, entrance),
-                ]}
-              />
-            ) : null}
-          </>
-        ) : null}
-        <View style={styles.floorBadge}>
-          <Text style={styles.floorBadgeText}>{floorLabel}</Text>
+      {showMap ? (
+        <MapViewer buildingKey={buildingKey} buildingName={buildingDisplayName} />
+      ) : (
+        <View style={[styles.viewer, { aspectRatio }]} onLayout={handleLayout}>
+          <Image source={source} style={styles.image} resizeMode="contain" />
+          {dimensions.width > 0 ? (
+            <>
+              {showRoom && room ? (
+                <View
+                  style={[
+                    styles.marker,
+                    styles.roomDot,
+                    computePosition(dimensions, room),
+                  ]}
+                />
+              ) : null}
+              {showEntrance && entrance ? (
+                <View
+                  style={[
+                    styles.marker,
+                    styles.entranceDot,
+                    computePosition(dimensions, entrance),
+                  ]}
+                />
+              ) : null}
+            </>
+          ) : null}
+          <View style={styles.floorBadge}>
+            <Text style={styles.floorBadgeText}>{floorLabel}</Text>
+          </View>
         </View>
-      </View>
+      )}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setShowMap((prev) => !prev)}
+        style={({ pressed }) => [
+          styles.toggleButton,
+          pressed ? styles.toggleButtonPressed : null,
+        ]}
+      >
+        <Ionicons
+          name={showMap ? 'image-outline' : 'map-outline'}
+          size={18}
+          color="#ffffff"
+        />
+        <Text style={styles.toggleButtonText}>
+          {showMap ? 'Vis etageplan' : 'Vis kort'}
+        </Text>
+      </Pressable>
     </View>
   );
 };
@@ -199,5 +231,24 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  toggleButtonPressed: {
+    opacity: 0.85,
+  },
+  toggleButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

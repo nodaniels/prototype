@@ -1,15 +1,7 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "jsx": "react-native",
     "strict": true,
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
     "allowJs": false,
-    "noEmit": true,
     "types": ["react", "react-native"]
   },
   "include": ["App.tsx", "src/**/*"],
