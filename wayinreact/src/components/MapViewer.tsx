@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Circle, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
+
+interface MarkerScreenPosition {
+  x: number;
+  y: number;
+  type: 'room' | 'entrance';
+}
 
 interface MapViewerProps {
   buildingKey: string;
   buildingName: string;
+  markerPositions: MarkerScreenPosition[];
 }
 
 interface BuildingMapConfig {
@@ -31,22 +38,25 @@ const BUILDING_MAP_CONFIGS: Record<string, BuildingMapConfig> = {
     zoom: 20,
   },
   solbjerg: {
-    latitude: 55.681725854994085,
+    latitude: 55.681625854994085,
     longitude: 12.529512433992615,
     latitudeDelta: 0.001,
     longitudeDelta: 0.001,
     pitch: 0,
-    heading: 0,
-    altitude: 800,
+    heading: 269.45,
+    altitude: 430,
     zoom: 17,
   },
 };
 
-export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName }) => {
+export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName, markerPositions }) => {
+  const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [gpsMarkers, setGpsMarkers] = useState<Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +117,35 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
     };
   }, []);
 
+  useEffect(() => {
+    if (!mapReady || markerPositions.length === 0 || !mapRef.current) {
+      return;
+    }
+
+    const convertMarkersToGPS = async () => {
+      const converted: Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }> = [];
+      
+      for (const marker of markerPositions) {
+        try {
+          const coordinate = await mapRef.current!.coordinateForPoint({ x: marker.x, y: marker.y });
+          if (coordinate) {
+            converted.push({
+              latitude: coordinate.latitude,
+              longitude: coordinate.longitude,
+              type: marker.type,
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to convert marker position:', error);
+        }
+      }
+      
+      setGpsMarkers(converted);
+    };
+
+    convertMarkersToGPS();
+  }, [mapReady, markerPositions]);
+
   const buildingConfig = BUILDING_MAP_CONFIGS[buildingKey];
 
   if (!buildingConfig) {
@@ -129,9 +168,11 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         provider={PROVIDER_DEFAULT}
         style={styles.map}
         mapType="satellite"
+        onMapReady={() => setMapReady(true)}
         initialRegion={{
           latitude: buildingConfig.latitude,
           longitude: buildingConfig.longitude,
@@ -159,7 +200,18 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName 
         pitchEnabled
         scrollEnabled
         zoomEnabled
-      />
+      >
+        {gpsMarkers.map((marker, index) => (
+          <Circle
+            key={`${marker.type}-${index}`}
+            center={{ latitude: marker.latitude, longitude: marker.longitude }}
+            radius={3}
+            fillColor={marker.type === 'room' ? '#22c55e' : '#f97316'}
+            strokeColor={marker.type === 'room' ? '#15803d' : '#ea580c'}
+            strokeWidth={2}
+          />
+        ))}
+      </MapView>
       {errorMessage && !permissionGranted ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{errorMessage}</Text>

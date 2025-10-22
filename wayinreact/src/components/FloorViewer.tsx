@@ -18,6 +18,12 @@ interface Dimensions {
   height: number;
 }
 
+interface MarkerScreenPosition {
+  x: number;
+  y: number;
+  type: 'room' | 'entrance';
+}
+
 const markerRadius = 10;
 
 const computeAspectRatio = (source: number) => {
@@ -93,6 +99,30 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
   const showRoom = Boolean(room);
   const showEntrance = Boolean(entrance);
 
+  const markerPositions = useMemo<MarkerScreenPosition[]>(() => {
+    if (dimensions.width === 0 || !source) {
+      return [];
+    }
+    const positions: MarkerScreenPosition[] = [];
+    if (showRoom && room) {
+      const pos = computePosition(dimensions, room);
+      positions.push({
+        x: pos.left + markerRadius,
+        y: pos.top + markerRadius,
+        type: 'room',
+      });
+    }
+    if (showEntrance && entrance) {
+      const pos = computePosition(dimensions, entrance);
+      positions.push({
+        x: pos.left + markerRadius,
+        y: pos.top + markerRadius,
+        type: 'entrance',
+      });
+    }
+    return positions;
+  }, [dimensions, room, entrance, showRoom, showEntrance, source]);
+
   return (
     <View>
       {showRoom || showEntrance ? (
@@ -112,7 +142,11 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
         </View>
       ) : null}
       {showMap ? (
-        <MapViewer buildingKey={buildingKey} buildingName={buildingDisplayName} />
+        <MapViewer
+          buildingKey={buildingKey}
+          buildingName={buildingDisplayName}
+          markerPositions={markerPositions}
+        />
       ) : (
         <View style={[styles.viewer, { aspectRatio }]} onLayout={handleLayout}>
           <Image source={source} style={styles.image} resizeMode="contain" />
