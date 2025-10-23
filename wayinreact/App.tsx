@@ -3,11 +3,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as Calendar from 'expo-calendar';
@@ -50,7 +50,7 @@ const App: React.FC = () => {
   );
 
   // Hooks
-  const { payload } = useRemoteBuildings();
+  const { payload, loading, error } = useRemoteBuildings();
   const {
     calendarPermissionStatus,
     calendarLookupError,
@@ -163,8 +163,8 @@ const App: React.FC = () => {
         calendarIds.map(async (id) => {
           try {
             return await Calendar.getEventsAsync([id], now, end);
-          } catch (error) {
-            console.warn(`Failed to fetch events for calendar ${id}`, error);
+          } catch (calendarError) {
+            console.warn(`Failed to fetch events for calendar ${id}`, calendarError);
             return [];
           }
         }),
@@ -227,8 +227,8 @@ const App: React.FC = () => {
         `Næste aftale "${eventSummary.title}" (${formattedTime}), men ingen lokale-information fundet.`,
       );
       setCalendarLookupError('Tilføj lokalenummer i kalenderaftalen for at finde det automatisk.');
-    } catch (error) {
-      console.warn('Calendar lookup failed', error);
+    } catch (lookupError) {
+      console.warn('Calendar lookup failed', lookupError);
       setCalendarLookupMessage(null);
       setCalendarLookupError('Noget gik galt under opslag i kalenderen.');
     } finally {
@@ -340,10 +340,30 @@ const App: React.FC = () => {
   }, [handleBack]);
 
   return (
-    <SafeAreaView style={appStyles.safeArea}>
-      <StatusBar style="dark" />
-      <View style={appStyles.screen}>
-        <KeyboardAvoidingView
+    <SafeAreaProvider>
+      <SafeAreaView style={appStyles.safeArea} edges={['top']}>
+        <StatusBar style="dark" />
+        <View style={appStyles.screen}>
+          {loading ? (
+            <View style={appStyles.loadingContainer}>
+              <Text style={appStyles.loadingTitle}>
+                Henter data...
+              </Text>
+              <Text style={appStyles.loadingSubtitle}>
+                Forbinder til Firebase
+              </Text>
+            </View>
+          ) : error ? (
+            <View style={appStyles.errorContainer}>
+              <Text style={appStyles.errorTitle}>
+                Kunne ikke indlæse data
+              </Text>
+              <Text style={appStyles.errorMessage}>
+                {error}
+              </Text>
+            </View>
+          ) : (
+          <KeyboardAvoidingView
           behavior={Platform.select({ ios: 'padding', android: undefined })}
           style={appStyles.keyboardAvoider}
           enabled={activeTab === 'home'}
@@ -430,6 +450,7 @@ const App: React.FC = () => {
             />
           )}
         </KeyboardAvoidingView>
+          )}
         <View style={appStyles.tabBar}>
           <Pressable
             accessibilityRole="button"
@@ -503,6 +524,7 @@ const App: React.FC = () => {
         </View>
       </View>
     </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 

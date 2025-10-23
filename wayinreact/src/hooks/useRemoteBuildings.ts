@@ -28,21 +28,36 @@ const fetchRemoteBuildings = async (): Promise<BuildingsPayload | null> => {
 
 export const useRemoteBuildings = () => {
   const [payload, setPayload] = useState<BuildingsPayload>(emptyPayload);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const remote = await fetchRemoteBuildings();
-      if (remote && !cancelled) {
-        setPayload(remote);
-        return;
+      try {
+        setLoading(true);
+        const remote = await fetchRemoteBuildings();
+        if (remote && !cancelled) {
+          setPayload(remote);
+          setError(null);
+        } else if (!cancelled) {
+          setError('Kunne ikke hente bygningsdata');
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError('Netværksfejl ved hentning af data');
+          console.warn('Error fetching remote buildings:', fetchError);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-      // Remote fetch failed; leave payload empty until data becomes available.
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { payload };
+  return { payload, loading, error };
 };

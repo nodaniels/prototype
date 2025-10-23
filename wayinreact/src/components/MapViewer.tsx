@@ -58,6 +58,8 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
   const [mapReady, setMapReady] = useState(false);
   const [gpsMarkers, setGpsMarkers] = useState<Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }>>([]);
 
+  const buildingConfig = BUILDING_MAP_CONFIGS[buildingKey];
+
   useEffect(() => {
     let cancelled = false;
     let subscription: Location.LocationSubscription | null = null;
@@ -117,36 +119,56 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
     };
   }, []);
 
+  // Re-center map and convert markers when building changes or new search is performed
   useEffect(() => {
-    if (!mapReady || markerPositions.length === 0 || !mapRef.current) {
+    if (!mapReady || !mapRef.current || !buildingConfig) {
       return;
     }
 
-    const convertMarkersToGPS = async () => {
-      const converted: Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }> = [];
-      
-      for (const marker of markerPositions) {
-        try {
-          const coordinate = await mapRef.current!.coordinateForPoint({ x: marker.x, y: marker.y });
-          if (coordinate) {
-            converted.push({
-              latitude: coordinate.latitude,
-              longitude: coordinate.longitude,
-              type: marker.type,
-            });
+    const resetMapAndConvertMarkers = async () => {
+      // First, reset camera to original building position INSTANTLY
+      mapRef.current!.setCamera({
+        center: {
+          latitude: buildingConfig.latitude,
+          longitude: buildingConfig.longitude,
+        },
+        pitch: buildingConfig.pitch,
+        heading: buildingConfig.heading,
+        altitude: buildingConfig.altitude,
+        zoom: buildingConfig.zoom,
+      });
+
+      // Wait a tiny bit for camera to settle
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Then convert markers to GPS coordinates
+      if (markerPositions.length > 0) {
+        const converted: Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }> = [];
+        
+        for (const marker of markerPositions) {
+          try {
+            const coordinate = await mapRef.current!.coordinateForPoint({ x: marker.x, y: marker.y });
+            if (coordinate) {
+              converted.push({
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                type: marker.type,
+              });
+            }
+          } catch (error) {
+            console.warn('Failed to convert marker position:', error);
           }
-        } catch (error) {
-          console.warn('Failed to convert marker position:', error);
         }
+        
+        setGpsMarkers(converted);
+      } else {
+        // Clear markers if no positions provided
+        setGpsMarkers([]);
       }
-      
-      setGpsMarkers(converted);
     };
 
-    convertMarkersToGPS();
-  }, [mapReady, markerPositions]);
-
-  const buildingConfig = BUILDING_MAP_CONFIGS[buildingKey];
+    resetMapAndConvertMarkers();
+  }, [buildingKey, mapReady, buildingConfig, markerPositions]);
 
   if (!buildingConfig) {
     return (
