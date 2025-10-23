@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import MapView, { Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { styles } from '../styles/MapViewer.styles';
 
 interface MarkerScreenPosition {
   x: number;
@@ -245,87 +246,3 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    minHeight: 400,
-  },
-  map: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    minHeight: 400,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    gap: 12,
-  },
-  loadingText: {
-    color: '#64748b',
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    minHeight: 400,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderRadius: 16,
-    padding: 24,
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  errorBanner: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: '#fef2f2',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-    shadowColor: '#020617',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  errorBannerText: {
-    color: '#ef4444',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  errorBannerSubtext: {
-    color: '#991b1b',
-    fontSize: 12,
-  },
-  infoBanner: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#020617',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  infoBannerText: {
-    color: '#1e40af',
-    fontWeight: '600',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});
