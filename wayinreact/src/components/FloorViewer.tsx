@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useMemo, useState } from 'react';
+import { Image, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { floorImages } from '../data/floorImages';
 import type { Entrance, Room } from '../types';
 import { MapViewer } from './MapViewer';
@@ -47,14 +46,8 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
 }: FloorViewerProps) => {
   const source = images[buildingKey]?.[floorKey];
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
-  const [showMap, setShowMap] = useState(false);
-
-  // Automatically switch to satellite view when a search is performed
-  useEffect(() => {
-    if (room || entrance) {
-      setShowMap(true);
-    }
-  }, [room, entrance]);
+  // Always show satellite map by default
+  const [showMap] = useState(true);
 
   const showRoom = Boolean(room);
   const showEntrance = Boolean(entrance);
@@ -198,24 +191,6 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
           </View>
         ) : null}
       </View>
-      
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setShowMap((prev) => !prev)}
-        style={({ pressed }) => [
-          styles.toggleButton,
-          pressed ? styles.toggleButtonPressed : null,
-        ]}
-      >
-        <Ionicons
-          name={showMap ? 'image-outline' : 'map-outline'}
-          size={18}
-          color="#ffffff"
-        />
-        <Text style={styles.toggleButtonText}>
-          {showMap ? 'Vis etageplan' : 'Vis kort'}
-        </Text>
-      </Pressable>
     </View>
   );
 };
@@ -287,25 +262,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
-  },
-  toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  toggleButtonPressed: {
-    opacity: 0.85,
-  },
-  toggleButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
   },
   mapOverlay: {
     ...StyleSheet.absoluteFillObject,

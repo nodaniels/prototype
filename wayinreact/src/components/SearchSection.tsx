@@ -144,16 +144,16 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   searchButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     justifyContent: 'center',
   },
   searchButtonLabel: {
     color: '#ffffff',
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15,
   },
   error: {
     marginBottom: 16,

@@ -196,9 +196,9 @@ const styles = StyleSheet.create({
   },
   quickLookupButton: {
     flex: 1,
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -206,15 +206,15 @@ const styles = StyleSheet.create({
   quickLookupButtonLabel: {
     color: '#ffffff',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14,
   },
   quickLookupCalendarButton: {
     flex: 1,
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   quickLookupCalendarButtonLabel: {
     color: '#ffffff',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14,
   },
   quickLookupHint: {
     marginTop: 12,
