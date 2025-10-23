@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Circle, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import MapView, { Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 
 interface MarkerScreenPosition {
@@ -49,9 +49,9 @@ const BUILDING_MAP_CONFIGS: Record<string, BuildingMapConfig> = {
   },
 };
 
-export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, buildingName, markerPositions }) => {
+export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositions }) => {
   const mapRef = useRef<MapView>(null);
-  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [_userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { floorImages } from '../data/floorImages';
@@ -49,6 +49,16 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   const [showMap, setShowMap] = useState(false);
 
+  // Automatically switch to satellite view when a search is performed
+  useEffect(() => {
+    if (room || entrance) {
+      setShowMap(true);
+    }
+  }, [room, entrance]);
+
+  const showRoom = Boolean(room);
+  const showEntrance = Boolean(entrance);
+
   const floorLabel = useMemo(() => {
     const normalized = floorName.replace(/_/g, ' ').trim();
     const withDot = normalized.replace(/(\d+)\s+sal/i, '$1. sal');
@@ -88,17 +98,6 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
     }
   };
 
-  if (!source) {
-    return (
-      <View style={styles.missingContainer}>
-        <Text style={styles.missingText}>Floor image ikke tilgængelig.</Text>
-      </View>
-    );
-  }
-
-  const showRoom = Boolean(room);
-  const showEntrance = Boolean(entrance);
-
   const markerPositions = useMemo<MarkerScreenPosition[]>(() => {
     if (dimensions.width === 0 || !source) {
       return [];
@@ -123,6 +122,14 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
     return positions;
   }, [dimensions, room, entrance, showRoom, showEntrance, source]);
 
+  if (!source) {
+    return (
+      <View style={styles.missingContainer}>
+        <Text style={styles.missingText}>Floor image ikke tilgængelig.</Text>
+      </View>
+    );
+  }
+
   return (
     <View>
       {showRoom || showEntrance ? (
@@ -141,14 +148,17 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
           ) : null}
         </View>
       ) : null}
-      {showMap ? (
-        <MapViewer
-          buildingKey={buildingKey}
-          buildingName={buildingDisplayName}
-          markerPositions={markerPositions}
-        />
-      ) : (
-        <View style={[styles.viewer, { aspectRatio }]} onLayout={handleLayout}>
+      
+      <View style={styles.container}>
+        {/* Floor plan always renders for dimension calculation and marker positioning */}
+        <View
+          style={[
+            styles.viewer,
+            { aspectRatio },
+            showMap ? styles.hiddenFloorPlan : null,
+          ]}
+          onLayout={handleLayout}
+        >
           <Image source={source} style={styles.image} resizeMode="contain" />
           {dimensions.width > 0 ? (
             <>
@@ -176,7 +186,19 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
             <Text style={styles.floorBadgeText}>{floorLabel}</Text>
           </View>
         </View>
-      )}
+
+        {/* Satellite map overlays when active */}
+        {showMap && dimensions.width > 0 ? (
+          <View style={styles.mapOverlay}>
+            <MapViewer
+              buildingKey={buildingKey}
+              buildingName={buildingDisplayName}
+              markerPositions={markerPositions}
+            />
+          </View>
+        ) : null}
+      </View>
+      
       <Pressable
         accessibilityRole="button"
         onPress={() => setShowMap((prev) => !prev)}
@@ -284,5 +306,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 16,
+  },
+  mapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+  },
+  container: {
+    position: 'relative',
+  },
+  hiddenFloorPlan: {
+    opacity: 0,
+    position: 'absolute',
+    pointerEvents: 'none',
   },
 });
