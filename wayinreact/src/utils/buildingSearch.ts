@@ -1,7 +1,20 @@
+/**
+ * buildingSearch.ts - Avanceret søgelogik for lokaler
+ * Håndterer fuzzy matching, bygningskoder og lokale-nummerformater
+ */
+
 import { BUILDING_CODE_MAP } from '../constants';
 import type { BuildingData, SearchResult } from '../types';
 import { searchRoomInBuilding } from './search';
 
+/**
+ * Genererer forskellige varianter af et lokalenummer for at forbedre søgeresultater
+ * @param buildingKey - Bygningsnøgle (porcelaenshaven/solbjerg)
+ * @param token - Lokale-token fra tekst
+ * @param context - Kontekst tekst for yderligere hints
+ * @param buildingCode - Bygningskode (R, S, etc.)
+ * @returns Liste af kandidat-strenge at søge efter
+ */
 export const createCandidatesFromLocation = (
   buildingKey: string,
   token: string,

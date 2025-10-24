@@ -1,9 +1,15 @@
+/**
+ * MapViewer - Satellitkortsvisning med GPS markører
+ * Viser satellitbillede af bygning med brugerens position og lokale-markører
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import MapView, { Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { styles } from '../styles/MapViewer.styles';
 
+/** Markørposition på skærmen (før GPS konvertering) */
 interface MarkerScreenPosition {
   x: number;
   y: number;
@@ -13,20 +19,22 @@ interface MarkerScreenPosition {
 interface MapViewerProps {
   buildingKey: string;
   buildingName: string;
-  markerPositions: MarkerScreenPosition[];
+  markerPositions: MarkerScreenPosition[]; // Skærmpositioner der konverteres til GPS
 }
 
+/** Konfiguration for hver bygning (GPS position, zoom niveau, rotation) */
 interface BuildingMapConfig {
   latitude: number;
   longitude: number;
   latitudeDelta: number;
   longitudeDelta: number;
-  pitch: number;
-  heading: number;
-  altitude: number;
+  pitch: number; // Kamera hældning
+  heading: number; // Kamera rotation
+  altitude: number; // Kamera højde
   zoom: number;
 }
 
+/** GPS koordinater og kameraindstillinger for hver bygning */
 const BUILDING_MAP_CONFIGS: Record<string, BuildingMapConfig> = {
   porcelaenshaven: {
     latitude: 55.67797960379468,
@@ -61,12 +69,14 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
 
   const buildingConfig = BUILDING_MAP_CONFIGS[buildingKey];
 
+  // Anmod om lokationstilladelser og start tracking
   useEffect(() => {
     let cancelled = false;
     let subscription: Location.LocationSubscription | null = null;
 
     (async () => {
       try {
+        // Anmod om tilladelse til at bruge lokation
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (cancelled) {
           return;
@@ -82,6 +92,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
         setPermissionGranted(true);
         setErrorMessage(null);
 
+        // Hent nuværende position
         const currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
@@ -91,11 +102,12 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
           setLoading(false);
         }
 
+        // Start live tracking af brugerens position
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 5000,
-            distanceInterval: 10,
+            timeInterval: 5000, // Opdater hvert 5. sekund
+            distanceInterval: 10, // Eller når bruger flytter 10 meter
           },
           (location) => {
             if (!cancelled) {
@@ -112,6 +124,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
       }
     })();
 
+    // Cleanup når komponent unmountes
     return () => {
       cancelled = true;
       if (subscription) {
@@ -120,14 +133,14 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
     };
   }, []);
 
-  // Re-center map and convert markers when building changes or new search is performed
+  // Nulstil kamera og konverter markører når bygning skifter eller ny søgning udføres
   useEffect(() => {
     if (!mapReady || !mapRef.current || !buildingConfig) {
       return;
     }
 
     const resetMapAndConvertMarkers = async () => {
-      // First, reset camera to original building position INSTANTLY
+      // Først nulstil kamera til bygningens standardposition ØJEBLIKKELIGT
       mapRef.current!.setCamera({
         center: {
           latitude: buildingConfig.latitude,
@@ -139,15 +152,16 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
         zoom: buildingConfig.zoom,
       });
 
-      // Wait a tiny bit for camera to settle
+      // Vent en smule på at kameraet stabiliserer sig
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Then convert markers to GPS coordinates
+      // Konverter derefter markører fra skærmpositioner til GPS koordinater
       if (markerPositions.length > 0) {
         const converted: Array<{ latitude: number; longitude: number; type: 'room' | 'entrance' }> = [];
         
         for (const marker of markerPositions) {
           try {
+            // coordinateForPoint konverterer pixel-koordinater til GPS
             const coordinate = await mapRef.current!.coordinateForPoint({ x: marker.x, y: marker.y });
             if (coordinate) {
               converted.push({
@@ -163,7 +177,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
         
         setGpsMarkers(converted);
       } else {
-        // Clear markers if no positions provided
+        // Ryd markører hvis ingen positioner er givet
         setGpsMarkers([]);
       }
     };
@@ -171,6 +185,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
     resetMapAndConvertMarkers();
   }, [buildingKey, mapReady, buildingConfig, markerPositions]);
 
+  // Vis fejl hvis bygningskonfiguration mangler
   if (!buildingConfig) {
     return (
       <View style={styles.errorContainer}>
@@ -179,6 +194,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
     );
   }
 
+  // Vis loading mens lokation hentes
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -190,6 +206,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
 
   return (
     <View style={styles.container}>
+      {/* Satellitkortet med brugerens position og markører */}
       <MapView
         ref={mapRef}
         provider={PROVIDER_DEFAULT}
@@ -224,6 +241,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
         scrollEnabled
         zoomEnabled
       >
+        {/* Vis GPS markører som cirkler på kortet */}
         {gpsMarkers.map((marker, index) => (
           <Circle
             key={`${marker.type}-${index}`}
@@ -235,6 +253,8 @@ export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositio
           />
         ))}
       </MapView>
+      
+      {/* Fejlbesked hvis tilladelser mangler */}
       {errorMessage && !permissionGranted ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{errorMessage}</Text>

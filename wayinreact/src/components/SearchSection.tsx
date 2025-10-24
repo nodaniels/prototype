@@ -1,21 +1,33 @@
+/**
+ * SearchSection - Søgning efter lokaler
+ * 
+ * Håndterer søgefeltet, resultater og visning af FloorViewer.
+ * Viser også forslag til populære lokaler.
+ */
+
 import React from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { FloorViewer } from './FloorViewer';
 import type { BuildingData, DisplayedFloor } from '../types';
 import { styles } from '../styles/SearchSection.styles';
 
+/** Props for SearchSection komponenten */
 interface SearchSectionProps {
-  selectedBuilding: BuildingData;
-  selectedBuildingKey: string;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  errorMessage: string | null;
-  displayedFloor: DisplayedFloor | null;
-  roomSuggestions: string[];
-  onSearch: () => void;
-  onSuggestionPress: (roomId: string) => void;
+  selectedBuilding: BuildingData; // Den valgte bygning
+  selectedBuildingKey: string; // Bygningens ID
+  searchQuery: string; // Nuværende søgetekst
+  setSearchQuery: (query: string) => void; // Opdater søgetekst
+  errorMessage: string | null; // Fejlbesked ved ugyldigt søgning
+  displayedFloor: DisplayedFloor | null; // Den etage der vises
+  roomSuggestions: string[]; // Forslag til populære lokaler
+  onSearch: () => void; // Udfør søgning
+  onSuggestionPress: (roomId: string) => void; // Tryk på et forslag
 }
 
+/**
+ * Viser søgefelt, resultater og plantegning/kort
+ * Inkluderer også forslag til hurtige søgninger
+ */
 export const SearchSection: React.FC<SearchSectionProps> = ({
   selectedBuilding,
   selectedBuildingKey,
@@ -29,9 +41,11 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
 }) => {
   return (
     <View style={styles.searchSection}>
+      {/* Bygningsnavn som overskrift */}
       <Text style={styles.sectionTitle}>{selectedBuilding.originalName.toUpperCase()}</Text>
       <Text style={styles.sectionSubtitle}>Indtast et lokale-navn (fx S10, R2.17, A101)</Text>
 
+      {/* Søgefelt med knap */}
       <View style={styles.searchRow}>
         <TextInput
           value={searchQuery}
@@ -47,8 +61,10 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
         </Pressable>
       </View>
 
+      {/* Fejlbesked hvis søgningen fejler */}
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
+      {/* Vis resultat eller placeholder */}
       {displayedFloor ? (
         <View style={styles.resultCard}>
           {displayedFloor.room ? (
@@ -76,6 +92,7 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
               </Text>
             </>
           )}
+          {/* Vis plantegning/satellitkortet */}
           <FloorViewer
             buildingKey={selectedBuildingKey}
             floorKey={displayedFloor.floorKey}
@@ -85,6 +102,7 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
           />
         </View>
       ) : (
+        // Placeholder når der ikke er søgt endnu
         <View style={styles.placeholder}>
           <Text style={styles.placeholderTitle}>Søg for at se etagekortet</Text>
           <Text style={styles.placeholderSubtitle}>
@@ -93,6 +111,7 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
         </View>
       )}
 
+      {/* Forslag til populære lokaler */}
       {roomSuggestions.length > 0 ? (
         <View style={styles.suggestionContainer}>
           <Text style={styles.suggestionLabel}>Populære lokaler</Text>

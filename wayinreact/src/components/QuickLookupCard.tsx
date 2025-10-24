@@ -1,3 +1,10 @@
+/**
+ * QuickLookupCard - Hurtig søgning via kalendertekst
+ * 
+ * Tillader brugere at indsætte tekst fra en kalenderaftale og automatisk
+ * finde lokalet. Kan også hente næste møde direkte fra kalenderen.
+ */
+
 import React from 'react';
 import {
   ActivityIndicator,
@@ -11,23 +18,28 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PermissionState } from '../constants';
 import { styles } from '../styles/QuickLookupCard.styles';
 
+/** Props for QuickLookupCard komponenten */
 interface QuickLookupCardProps {
-  quickLookupValue: string;
-  setQuickLookupValue: (value: string) => void;
-  quickLookupError: string | null;
-  setQuickLookupError: (error: string | null) => void;
-  quickLookupInfoVisible: boolean;
-  setQuickLookupInfoVisible: (visible: boolean) => void;
-  calendarLookupLoading: boolean;
-  calendarLookupError: string | null;
-  calendarLookupMessage: string | null;
-  calendarLastEvent: { id: string; title: string; startDate: Date; location?: string | null } | null;
-  calendarLastEventSummary: string | null;
-  calendarPermissionStatus: PermissionState;
-  onQuickLookup: () => void;
-  onCalendarLookup: () => void;
+  quickLookupValue: string; // Tekst indsat af bruger
+  setQuickLookupValue: (value: string) => void; // Opdater tekst
+  quickLookupError: string | null; // Fejlbesked
+  setQuickLookupError: (error: string | null) => void; // Opdater fejl
+  quickLookupInfoVisible: boolean; // Om info-modal er synlig
+  setQuickLookupInfoVisible: (visible: boolean) => void; // Toggle info-modal
+  calendarLookupLoading: boolean; // Om der hentes fra kalender
+  calendarLookupError: string | null; // Fejl fra kalender
+  calendarLookupMessage: string | null; // Besked fra kalender
+  calendarLastEvent: { id: string; title: string; startDate: Date; location?: string | null } | null; // Sidste kalenderaftale
+  calendarLastEventSummary: string | null; // Opsummering af sidste aftale
+  calendarPermissionStatus: PermissionState; // Kalender-tilladelser
+  onQuickLookup: () => void; // Søg baseret på tekst
+  onCalendarLookup: () => void; // Hent næste møde fra kalender
 }
 
+/**
+ * Komponent til hurtig søgning via kalendertekst
+ * Brugeren kan enten indsætte tekst manuelt eller hente fra kalender
+ */
 export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
   quickLookupValue,
   setQuickLookupValue,
@@ -47,6 +59,7 @@ export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
   return (
     <>
       <View style={styles.quickLookupCard}>
+        {/* Header med info-knap */}
         <View style={styles.quickLookupHeader}>
           <Text style={styles.quickLookupTitle}>Indsæt kalendertekst</Text>
           <Pressable
@@ -57,11 +70,13 @@ export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
             <Text style={styles.quickLookupInfoLabel}>i</Text>
           </Pressable>
         </View>
+        
+        {/* Tekstfelt til kalendertekst */}
         <TextInput
           value={quickLookupValue}
           onChangeText={(value) => {
             setQuickLookupValue(value);
-            setQuickLookupError(null);
+            setQuickLookupError(null); // Nulstil fejl når bruger skriver
           }}
           placeholder='Fx "Statusmøde i S10" eller "Lokale R2.17, Solbjerg"'
           placeholderTextColor="#94a3b8"
@@ -72,10 +87,15 @@ export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
           onSubmitEditing={onQuickLookup}
           blurOnSubmit
         />
+        
+        {/* Handlingsknapper */}
         <View style={styles.quickLookupActions}>
+          {/* Manuel søgning */}
           <Pressable style={styles.quickLookupButton} onPress={onQuickLookup}>
             <Text style={styles.quickLookupButtonLabel}>Find lokale</Text>
           </Pressable>
+          
+          {/* Kalender integration */}
           <Pressable
             accessibilityRole="button"
             disabled={calendarLookupLoading}
@@ -100,6 +120,8 @@ export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
             </Text>
           </Pressable>
         </View>
+        
+        {/* Fejl- og statusbeskeder */}
         {quickLookupError ? <Text style={styles.error}>{quickLookupError}</Text> : null}
         {calendarLookupError ? <Text style={styles.error}>{calendarLookupError}</Text> : null}
         {calendarLookupMessage ? (
@@ -112,6 +134,7 @@ export const QuickLookupCard: React.FC<QuickLookupCardProps> = ({
         ) : null}
       </View>
 
+      {/* Info-modal der forklarer funktionen */}
       <Modal
         visible={quickLookupInfoVisible}
         animationType="fade"

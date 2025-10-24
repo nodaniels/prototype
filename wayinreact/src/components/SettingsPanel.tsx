@@ -1,17 +1,29 @@
+/**
+ * SettingsPanel - App-indstillinger
+ * 
+ * Giver brugeren mulighed for at tilpasse app-oplevelsen med
+ * notifikationer, kalender-sync og dark mode (mock-data).
+ */
+
 import React from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from '../styles/SettingsPanel.styles';
 
+/** Props for SettingsPanel komponenten */
 interface SettingsPanelProps {
-  notificationsEnabled: boolean;
-  setNotificationsEnabled: (enabled: boolean) => void;
-  calendarSyncEnabled: boolean;
-  onToggleCalendarSync: (value: boolean) => Promise<void>;
-  darkModeEnabled: boolean;
-  setDarkModeEnabled: (enabled: boolean) => void;
+  notificationsEnabled: boolean; // Om notifikationer er aktive
+  setNotificationsEnabled: (enabled: boolean) => void; // Toggle notifikationer
+  calendarSyncEnabled: boolean; // Om kalender-sync er aktiv
+  onToggleCalendarSync: (value: boolean) => Promise<void>; // Toggle kalender-sync (asynkron)
+  darkModeEnabled: boolean; // Om dark mode er aktiv
+  setDarkModeEnabled: (enabled: boolean) => void; // Toggle dark mode
 }
 
+/**
+ * Komponent til styring af app-indstillinger
+ * Viser toggle switches for forskellige features
+ */
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   notificationsEnabled,
   setNotificationsEnabled,
@@ -23,13 +35,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <ScrollView contentContainerStyle={styles.sectionContent}>
       <View style={styles.settingsSection}>
+        {/* Header med forklaring */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleLarge}>Indstillinger</Text>
           <Text style={styles.sectionSubtitleMuted}>
             Tilpas WayInn-oplevelsen. Indstillingerne er mock-data og bliver ikke gemt endnu.
           </Text>
         </View>
+        
+        {/* Indstillingskort med toggles */}
         <View style={styles.settingsCard}>
+          {/* Notifikationer */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsRowText}>
               <Text style={styles.settingsOption}>Notifikationer</Text>
@@ -44,7 +60,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               thumbColor={notificationsEnabled ? '#2563eb' : '#f1f5f9'}
             />
           </View>
+          
           <View style={styles.settingsDivider} />
+          
+          {/* Kalender-sync */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsRowText}>
               <Text style={styles.settingsOption}>Kalender-sync</Text>
@@ -56,6 +75,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               value={calendarSyncEnabled}
               onValueChange={async (value) => {
                 try {
+                  // Håndter asynkron kalender-sync toggle
                   await onToggleCalendarSync(value);
                 } catch (error) {
                   console.warn('Kalender-sync toggle mislykkedes', error);
@@ -65,7 +85,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               thumbColor={calendarSyncEnabled ? '#2563eb' : '#f1f5f9'}
             />
           </View>
+          
           <View style={styles.settingsDivider} />
+          
+          {/* Dark mode */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsRowText}>
               <Text style={styles.settingsOption}>Mørkt tema</Text>
@@ -81,6 +104,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             />
           </View>
         </View>
+        
+        {/* Info om kommende features */}
         <View style={styles.settingsInfo}>
           <Ionicons name="information-circle-outline" size={20} color="#2563eb" />
           <Text style={styles.settingsInfoText}>

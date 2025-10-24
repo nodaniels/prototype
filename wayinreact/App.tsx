@@ -1,3 +1,8 @@
+/**
+ * WayInn - Indoor navigation app
+ * Hovedkomponent der håndterer app navigation, søgning og kalender integration
+ */
+
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -32,33 +37,37 @@ import { extractRoomFromText, isGroundFloor } from './src/utils/buildingSearch';
 import { appStyles } from './src/styles/AppStyles';
 
 const App: React.FC = () => {
-  // State
-  const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [displayedFloor, setDisplayedFloor] = useState<DisplayedFloor | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [quickLookupValue, setQuickLookupValue] = useState('');
-  const [quickLookupError, setQuickLookupError] = useState<string | null>(null);
-  const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [calendarLookupLoading, setCalendarLookupLoading] = useState(false);
-  const [calendarLookupMessage, setCalendarLookupMessage] = useState<string | null>(null);
-  const [calendarLastEvent, setCalendarLastEvent] = useState<CalendarEventSummary | null>(null);
-  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
+  // UI State - håndterer app navigation og visninger
+  const [selectedBuildingKey, setSelectedBuildingKey] = useState<string | null>(null); // Valgt bygning
+  const [searchQuery, setSearchQuery] = useState(''); // Søgefelt input
+  const [displayedFloor, setDisplayedFloor] = useState<DisplayedFloor | null>(null); // Viser nuværende etage
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Fejlbesked til bruger
+  const [quickLookupValue, setQuickLookupValue] = useState(''); // Hurtig søgning input
+  const [quickLookupError, setQuickLookupError] = useState<string | null>(null); // Hurtig søgning fejl
+  const [quickLookupInfoVisible, setQuickLookupInfoVisible] = useState(false); // Vis info modal
+  const [activeTab, setActiveTab] = useState<TabKey>('home'); // Aktiv fane (hjem/institutioner/indstillinger)
+  
+  // Kalender state - håndterer kalender integration
+  const [calendarLookupLoading, setCalendarLookupLoading] = useState(false); // Loading state for kalender
+  const [calendarLookupMessage, setCalendarLookupMessage] = useState<string | null>(null); // Kalender status besked
+  const [calendarLastEvent, setCalendarLastEvent] = useState<CalendarEventSummary | null>(null); // Seneste kalenderaftale
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false); // Kalender sync aktiveret
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(
-    () => INSTITUTION_OPTIONS[0]?.id ?? null,
+    () => INSTITUTION_OPTIONS[0]?.id ?? null, // Default til første institution
   );
 
-  // Hooks
-  const { payload, loading, error } = useRemoteBuildings();
+  // Hooks - henter data og håndterer permissions
+  const { payload, loading, error } = useRemoteBuildings(); // Henter bygningsdata fra Firebase
   const {
     calendarPermissionStatus,
     calendarLookupError,
     setCalendarLookupError,
     ensureCalendarAccess,
-  } = useCalendarPermissions();
+  } = useCalendarPermissions(); // Håndterer kalender adgang
 
-  // Computed values
+  // Computed values - beregner værdier baseret på state
+  
+  /** Finder den valgte institution fra liste */
   const selectedInstitution = useMemo(() => {
     return (
       INSTITUTION_OPTIONS.find((option) => option.id === selectedInstitutionId) ??
@@ -67,6 +76,7 @@ const App: React.FC = () => {
     );
   }, [selectedInstitutionId]);
 
+  /** Formaterer seneste kalenderaftale til visning */
   const calendarLastEventSummary = useMemo(() => {
     if (!calendarLastEvent) {
       return null;
@@ -82,6 +92,7 @@ const App: React.FC = () => {
     return `${formatted}${locationPart}`;
   }, [calendarLastEvent]);
 
+  /** Konverterer bygningsdata til liste format */
   const buildingEntries = useMemo<BuildingEntry[]>(() => {
     return Object.entries(payload.buildings).map(([key, value]) => ({
       key,
@@ -92,10 +103,12 @@ const App: React.FC = () => {
     }));
   }, [payload]);
 
+  /** Finder den valgte bygning fra nøgle */
   const selectedBuilding: BuildingData | null = selectedBuildingKey
     ? (payload.buildings[selectedBuildingKey] as BuildingData)
     : null;
 
+  /** Henter lokaleforslag til visning (maks 20) */
   const roomSuggestions = useMemo(() => {
     if (!selectedBuilding) {
       return [] as string[];
@@ -103,7 +116,13 @@ const App: React.FC = () => {
     return listRoomIds(selectedBuilding).slice(0, 20);
   }, [selectedBuilding]);
 
-  // Handlers
+  // Event Handlers
+  
+  /**
+   * Anvender søgeresultat - opdaterer UI til at vise fundet lokale
+   * @param buildingKey - Bygningsnøgle
+   * @param result - Søgeresultat med etage og lokale info
+   */
   const applySearchResult = useCallback(
     (buildingKey: string, result: SearchResult) => {
       setSelectedBuildingKey(buildingKey);
@@ -121,6 +140,10 @@ const App: React.FC = () => {
     [],
   );
 
+  /**
+   * Håndterer hurtig søgning fra tekstinput
+   * Ekstraherer lokalenummer fra tekst og finder lokale
+   */
   const handleQuickLookup = useCallback(() => {
     if (!quickLookupValue.trim()) {
       setQuickLookupError('Indsæt et lokalenummer');
@@ -137,6 +160,10 @@ const App: React.FC = () => {
     applySearchResult(match.buildingKey, match.result);
   }, [applySearchResult, quickLookupValue, payload.buildings]);
 
+  /**
+   * Henter næste kalenderaftale og finder lokale info
+   * Scanner kalenderaftaler for lokalenumre og viser dem automatisk
+   */
   const handleCalendarLookup = useCallback(async () => {
     setCalendarLookupError(null);
     setCalendarLookupMessage('Finder næste kalenderaftale...');
@@ -236,6 +263,10 @@ const App: React.FC = () => {
     }
   }, [applySearchResult, ensureCalendarAccess, payload.buildings, setCalendarLookupError]);
 
+  /**
+   * Aktiverer/deaktiverer kalender sync
+   * @param value - True for at aktivere, false for at deaktivere
+   */
   const handleToggleCalendarSync = useCallback(
     async (value: boolean) => {
       setCalendarSyncEnabled(value);
@@ -254,6 +285,10 @@ const App: React.FC = () => {
     [ensureCalendarAccess, setCalendarLookupError],
   );
 
+  /**
+   * Vælger en bygning og viser stueetagen
+   * @param key - Bygningsnøgle
+   */
   const handleSelectBuilding = useCallback(
     (key: string) => {
       setSelectedBuildingKey(key);
@@ -285,6 +320,10 @@ const App: React.FC = () => {
     [payload],
   );
 
+  /**
+   * Håndterer søgning efter lokale
+   * Søger i valgt bygning eller globalt hvis ingen bygning valgt
+   */
   const handleSearch = useCallback(() => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
@@ -312,6 +351,10 @@ const App: React.FC = () => {
     applySearchResult(globalMatch.buildingKey, globalMatch.result);
   }, [applySearchResult, searchQuery, selectedBuilding, selectedBuildingKey, payload.buildings]);
 
+  /**
+   * Håndterer klik på lokaleforslag
+   * @param roomId - Lokale ID at søge efter
+   */
   const handleSuggestionPress = useCallback(
     (roomId: string) => {
       if (!selectedBuilding || !selectedBuildingKey) {
@@ -326,6 +369,7 @@ const App: React.FC = () => {
     [applySearchResult, selectedBuilding, selectedBuildingKey],
   );
 
+  /** Går tilbage til bygningsvalg */
   const handleBack = useCallback(() => {
     setSelectedBuildingKey(null);
     setSearchQuery('');
@@ -334,6 +378,7 @@ const App: React.FC = () => {
     setQuickLookupError(null);
   }, []);
 
+  /** Navigerer til valgt institution og går til hjem-fanen */
   const handleNavigateToInstitution = useCallback(() => {
     handleBack();
     setActiveTab('home');

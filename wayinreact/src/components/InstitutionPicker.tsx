@@ -1,16 +1,28 @@
+/**
+ * InstitutionPicker - Vælger institution/organisation
+ * 
+ * Giver brugeren mulighed for at skifte mellem forskellige institutioner
+ * (f.eks. CBS, Novo Nordisk). Viser aktiv institution og tilgængelige campus.
+ */
+
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { InstitutionOption } from '../constants';
 import { styles } from '../styles/InstitutionPicker.styles';
 
+/** Props for InstitutionPicker komponenten */
 interface InstitutionPickerProps {
-  institutionOptions: InstitutionOption[];
-  selectedInstitution: InstitutionOption | null;
-  onSelectInstitution: (id: string) => void;
-  onNavigateToInstitution: () => void;
+  institutionOptions: InstitutionOption[]; // Liste af tilgængelige institutioner
+  selectedInstitution: InstitutionOption | null; // Aktuel valgt institution
+  onSelectInstitution: (id: string) => void; // Vælg institution
+  onNavigateToInstitution: () => void; // Naviger til valgt institution
 }
 
+/**
+ * Komponent til valg af institution
+ * Viser liste af tilgængelige organisationer med campus og region
+ */
 export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
   institutionOptions,
   selectedInstitution,
@@ -20,6 +32,7 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
   return (
     <ScrollView contentContainerStyle={styles.sectionContent}>
       <View style={styles.institutionSection}>
+        {/* Header med forklaring */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleLarge}>Skift institution</Text>
           <Text style={styles.sectionSubtitleMuted}>
@@ -27,6 +40,8 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
             til test.
           </Text>
         </View>
+        
+        {/* Liste af institutioner */}
         <View style={styles.institutionList}>
           {institutionOptions.map((institution) => {
             const isActive = selectedInstitution?.id === institution.id;
@@ -43,10 +58,13 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
               >
                 <View style={styles.institutionCardContent}>
                   <View style={styles.institutionText}>
+                    {/* Institution navn */}
                     <Text style={styles.institutionName}>{institution.name}</Text>
+                    {/* Organisation og region */}
                     <Text style={styles.institutionMeta}>
                       {institution.organization} • {institution.region}
                     </Text>
+                    {/* Campus badges */}
                     <View style={styles.institutionBadges}>
                       {institution.campuses.map((campus) => (
                         <View key={campus} style={styles.institutionBadge}>
@@ -55,6 +73,7 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
                       ))}
                     </View>
                   </View>
+                  {/* Ikon der viser om institution er aktiv */}
                   <Ionicons
                     name={isActive ? 'checkmark-circle' : 'business-outline'}
                     size={22}
@@ -65,6 +84,8 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
             );
           })}
         </View>
+        
+        {/* Detaljer om aktiv institution */}
         {selectedInstitution ? (
           <View style={styles.institutionDetails}>
             <Text style={styles.institutionDetailsTitle}>Aktiv institution</Text>
@@ -72,6 +93,7 @@ export const InstitutionPicker: React.FC<InstitutionPickerProps> = ({
             <Text style={styles.institutionDetailsDescription}>
               {selectedInstitution.organization} • {selectedInstitution.region}
             </Text>
+            {/* Knap til at skifte til institution */}
             <Pressable
               accessibilityRole="button"
               style={styles.institutionAction}
