@@ -58,6 +58,11 @@ const BUILDING_MAP_CONFIGS: Record<string, BuildingMapConfig> = {
   },
 };
 
+// Hjælpefunktion til at tjekke om en bygning har GPS-konfiguration
+export const hasMapConfiguration = (buildingKey: string): boolean => {
+  return buildingKey in BUILDING_MAP_CONFIGS;
+};
+
 export const MapViewer: React.FC<MapViewerProps> = ({ buildingKey, markerPositions }) => {
   const mapRef = useRef<MapView>(null);
   const [_userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);

@@ -10,7 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { Image, LayoutChangeEvent, Text, View } from 'react-native';
 import { floorImages } from '../data/floorImages';
 import type { Entrance, Room } from '../types';
-import { MapViewer } from './MapViewer';
+import { MapViewer, hasMapConfiguration } from './MapViewer';
 import { styles } from '../styles/FloorViewer.styles';
 
 /** Props for FloorViewer komponenten */
@@ -75,8 +75,12 @@ export const FloorViewer: React.FC<FloorViewerProps> = ({
   // State til at gemme billedets dimensioner når det er indlæst
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   
-  // Vis altid satellitkortet som standard
-  const [showMap] = useState(true);
+  // Tjek om bygningen har GPS-koordinater konfigureret
+  // Hvis ikke, vis kun plantegningen
+  const hasGpsConfig = useMemo(() => hasMapConfiguration(buildingKey), [buildingKey]);
+  
+  // Vis kun satellitkortet hvis bygningen har GPS-konfiguration
+  const showMap = hasGpsConfig;
 
   // Tjek om der er et lokale eller indgang at vise
   const showRoom = Boolean(room);

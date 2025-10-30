@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# Environment variables (secrets!)
+.env
+
+# Firebase credentials (secrets!)
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+
+# Output folders
+wayinreact/
+output/
+*.png
+*.json
+!requirements.txt
+!package.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
