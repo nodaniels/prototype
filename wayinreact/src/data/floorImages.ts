@@ -6,11 +6,6 @@ export const floorImages = {
     '4_sal': require('../../assets/porcelaenshaven/4_sal.png'),
     'stue': require('../../assets/porcelaenshaven/stue.png'),
   },
-  'solbjerg2': {
-    '1_sal': require('../../assets/solbjerg2/1_sal.png'),
-    '2_sal': require('../../assets/solbjerg2/2_sal.png'),
-    'stue': require('../../assets/solbjerg2/stue.png'),
-  },
   'solbjerg': {
     '1_sal': require('../../assets/solbjerg/1_sal.png'),
     '2_sal': require('../../assets/solbjerg/2_sal.png'),
