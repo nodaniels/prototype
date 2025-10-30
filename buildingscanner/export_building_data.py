@@ -26,7 +26,7 @@ from pdf_parser import BuildingManager
 
 ROOT = Path(__file__).resolve().parent
 BUILDINGS_DIR = ROOT / "bygninger"
-OUTPUT_DIR = ROOT / "wayinreact"
+OUTPUT_DIR = ROOT.parent / "wayinreact"  # Går et niveau op til prototype/ og ind i wayinreact/
 ASSETS_DIR = OUTPUT_DIR / "assets"
 DATA_DIR = OUTPUT_DIR / "src" / "data"
 

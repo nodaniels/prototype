@@ -3,9 +3,9 @@
     "dalgas": {
       "originalName": "dalgas",
       "floors": {
-        "2_sal": {
-          "originalName": "2_sal",
-          "image": "dalgas/2_sal.png",
+        "1_sal": {
+          "originalName": "1_sal",
+          "image": "dalgas/1_sal.png",
           "rooms": [
             {
               "id": "ROOMS",

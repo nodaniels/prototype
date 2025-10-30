@@ -1,4 +1,7 @@
 export const floorImages = {
+  'dalgas': {
+    '2_sal': require('../../assets/dalgas/2_sal.png'),
+  },
   'porcelaenshaven': {
     '1_sal': require('../../assets/porcelaenshaven/1_sal.png'),
     '2_sal': require('../../assets/porcelaenshaven/2_sal.png'),
